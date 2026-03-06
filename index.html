@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>1D Dimensional Scanner - Precision Edition</title>
+    <style>
+        :root { --accent: #00ffcc; --bg: #0a0a0a; --panel: #1b1b1b; }
+        body { background: var(--bg); color: #e0e0e0; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; padding: 20px; user-select: none; overflow: hidden; }
+        
+        #mapContainer { 
+            height: 512px; overflow: hidden; transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 2px solid #333; background: #000; margin-bottom: 10px;
+        }
+        #mapContainer.collapsed { height: 0px; border-color: transparent; }
+        canvas { image-rendering: pixelated; cursor: crosshair; display: block; }
+
+        .controls { background: var(--panel); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #333; text-align: center; width: 512px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .slider-group { margin: 10px 0; font-size: 0.8em; color: var(--accent); letter-spacing: 1px; }
+        input[type=range] { width: 200px; accent-color: var(--accent); vertical-align: middle; cursor: pointer; }
+
+        button { padding: 10px 20px; cursor: pointer; background: var(--accent); border: none; color: #000; font-weight: bold; border-radius: 4px; transition: 0.2s; text-transform: uppercase; }
+        button:disabled { background: #333; color: #666; cursor: not-allowed; }
+        button:hover:not(:disabled) { filter: brightness(1.2); box-shadow: 0 0 15px var(--accent); }
+
+        #runUI { text-align: center; }
+        /* 1D Viewport */
+        #canvas1D { border: 4px solid #333; background: #050505; margin-top: 10px; box-shadow: inset 0 0 20px #000; }
+        
+        .status { color: var(--accent); font-size: 0.9em; margin-top: 10px; height: 1.2em; text-transform: uppercase; text-shadow: 0 0 5px var(--accent); }
+        .hint { font-size: 0.75em; color: #555; margin-top: 20px; line-height: 1.4; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <div class="slider-group">
+            GRID SCALE: <span id="resVal">16x16</span> 
+            <input type="range" id="resSlider" min="8" max="123" value="16">
+        </div>
+        <button id="modeBtn" disabled>START SCAN</button>
+        <button id="clearBtn" style="background:#444; color:#fff; margin-left: 8px;">WIPE</button>
+        <div id="status" class="status">CREATE PATH: GREEN TO RED</div>
+    </div>
+
+    <div id="mapContainer">
+        <canvas id="mazeCanvas" width="512" height="512"></canvas>
+    </div>
+
+    <div id="runUI" class="hidden">
+        <canvas id="canvas1D" width="512" height="80"></canvas>
+        <div class="status">HOLD [P] TO PEEK BLUEPRINT</div>
+        <p class="hint">ARROW KEYS: MOVE/SHIFT | 'P' KEY: SHOW MAP<br>TIP: Diagonal movement prevents corner sticking.</p>
+    </div>
+
+<script>
+let gridSize = 16;
+let cellSize = 512 / gridSize;
+let maze = [];
+let isBuilding = true, isPeeking = false, isDragging = false, brushType = 1;
+let playerX = 0, offset = 0;
+
+const canvas = document.getElementById('mazeCanvas');
+const ctx = canvas.getContext('2d');
+const canvas1D = document.getElementById('canvas1D');
+const ctx1D = canvas1D.getContext('2d');
+const mapContainer = document.getElementById('mapContainer');
+const resSlider = document.getElementById('resSlider');
+const modeBtn = document.getElementById('modeBtn');
+const clearBtn = document.getElementById('clearBtn');
+
+/** INITIALIZE MAZE **/
+function initMaze(size) {
+    gridSize = size;
+    cellSize = 512 / gridSize;
+    maze = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
+    playerX = 0; 
+    offset = 0;
+    modeBtn.disabled = !isSolvable();
+    draw2D();
+}
+
+/** AUDIO **/
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playMerp() {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(70, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+}
+
+/** PATHFINDING (BFS) **/
+function isSolvable() {
+    let q = [[0, 0]], v = new Set(['0,0']);
+    while(q.length > 0) {
+        let [x, y] = q.shift();
+        if(x === gridSize-1 && y === gridSize-1) return true;
+        [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
+            let nx = x + dx, ny = y + dy;
+            if(nx>=0 && nx<gridSize && ny>=0 && ny<gridSize && maze[ny][nx]===0 && !v.has(`${nx},${ny}`)) {
+                v.add(`${nx},${ny}`); q.push([nx, ny]);
+            }
+        });
+    }
+    return false;
+}
+
+/** DRAWING 2D **/
+function draw2D() {
+    ctx.clearRect(0, 0, 512, 512);
+    for(let y=0; y<gridSize; y++) {
+        for(let x=0; x<gridSize; x++) {
+            if(x===0 && y===0) ctx.fillStyle = '#2ecc71';
+            else if(x===gridSize-1 && y===gridSize-1) ctx.fillStyle = '#e74c3c';
+            else ctx.fillStyle = maze[y][x] === 1 ? '#000' : '#fff';
+            
+            // Draw Cell
+            ctx.fillRect(x*cellSize, (gridSize-1-y)*cellSize, cellSize, cellSize);
+            
+            // Draw subtle grid lines if scale is small enough
+            if(gridSize < 50) {
+                ctx.strokeStyle = 'rgba(0,0,0,0.05)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x*cellSize, (gridSize-1-y)*cellSize, cellSize, cellSize);
+            }
+        }
+    }
+    
+    if(!isBuilding) {
+        // High Vis Scanline
+        ctx.strokeStyle = '#00ffcc'; 
+        ctx.lineWidth = Math.max(1.5, 6 - (gridSize/25));
+        ctx.beginPath();
+        ctx.moveTo(0, (gridSize - 1 - offset) * cellSize + (cellSize/2));
+        ctx.lineTo(512, (gridSize - 1 - (gridSize - 1 + offset)) * cellSize + (cellSize/2));
+        ctx.stroke();
+    }
+}
+
+/** DRAWING 1D (Canvas-based for sub-pixel precision) **/
+function render1D() {
+    ctx1D.clearRect(0, 0, 512, 80);
+    const bW = 512 / gridSize;
+    
+    for(let x=0; x<gridSize; x++) {
+        let y = x + offset;
+        let isWall = (y < 0 || y >= gridSize || maze[y][x] === 1);
+        
+        if(x === 0 && y === 0) ctx1D.fillStyle = '#2ecc71';
+        else if(x === gridSize-1 && y === gridSize-1) ctx1D.fillStyle = '#e74c3c';
+        else ctx1D.fillStyle = isWall ? '#000' : '#fff';
+        
+        // Math.ceil prevents the "tiny borders" / gaps between blocks
+        ctx1D.fillRect(x * bW, 0, Math.ceil(bW), 80);
+    }
+    
+    // Draw Player Needle
+    ctx1D.fillStyle = '#00ffcc';
+    const pW = Math.max(2, bW * 0.6);
+    const pX = (playerX * bW) + (bW - pW)/2;
+    ctx1D.shadowBlur = 10;
+    ctx1D.shadowColor = '#00ffcc';
+    ctx1D.fillRect(pX, 15, pW, 50);
+    ctx1D.shadowBlur = 0;
+}
+
+/** INTERACTION **/
+canvas.onmousedown = e => {
+    if(!isBuilding) return;
+    isDragging = true;
+    const x = Math.floor(e.offsetX / cellSize), y = gridSize - 1 - Math.floor(e.offsetY / cellSize);
+    if(x>=0 && x<gridSize && y>=0 && y<gridSize) {
+        brushType = maze[y][x] === 0 ? 1 : 0;
+        paint(e);
+    }
+};
+window.onmouseup = () => isDragging = false;
+canvas.onmousemove = paint;
+
+function paint(e) {
+    if(!isBuilding || !isDragging) return;
+    const x = Math.floor(e.offsetX / cellSize), y = gridSize - 1 - Math.floor(e.offsetY / cellSize);
+    if(x>=0 && x<gridSize && y>=0 && y<gridSize && !((x===0&&y===0)||(x===gridSize-1&&y===gridSize-1))) {
+        maze[y][x] = brushType; 
+        draw2D();
+        const ok = isSolvable();
+        modeBtn.disabled = !ok;
+        document.getElementById('status').innerText = ok ? "PATH VERIFIED." : "PATH BLOCKED!";
+    }
+}
+
+resSlider.oninput = () => {
+    const val = parseInt(resSlider.value);
+    document.getElementById('resVal').innerText = `${val}x${val}`;
+    initMaze(val);
+};
+
+clearBtn.onclick = () => {
+    initMaze(gridSize); // Re-inits current grid size to 0s
+};
+
+modeBtn.onclick = () => {
+    isBuilding = !isBuilding;
+    mapContainer.classList.toggle('collapsed', !isBuilding);
+    document.getElementById('runUI').classList.toggle('hidden', isBuilding);
+    modeBtn.innerText = isBuilding ? "START SCAN" : "EDIT BLUEPRINT";
+    if(!isBuilding) render1D();
+    draw2D();
+};
+
+window.onkeydown = e => {
+    const key = e.key.toLowerCase();
+    if(key === 'p') mapContainer.classList.remove('collapsed');
+    if(isBuilding) return;
+    
+    let nX = playerX, nO = offset;
+    let isShiftAction = (e.key === "ArrowUp" || e.key === "ArrowDown");
+
+    if(e.key === "ArrowLeft") nX = Math.max(0, playerX - 1);
+    if(e.key === "ArrowRight") nX = Math.min(gridSize-1, playerX + 1);
+    if(e.key === "ArrowUp") nO = Math.min(gridSize-1, offset + 1);
+    if(e.key === "ArrowDown") nO = Math.max(-(gridSize-1), offset - 1);
+
+    // Initial check: is the intended move blocked?
+    let tY = nX + nO;
+    let isBlocked = (tY < 0 || tY >= gridSize || maze[tY][nX] === 1);
+
+    // --- NUDGE LOGIC ---
+    // If it's a Shift (Up/Down) and we are blocked, look for a side-opening
+    if (isBlocked && isShiftAction) {
+        let canNudgeRight = (nX + 1 < gridSize && (nX + 1 + nO >= 0 && nX + 1 + nO < gridSize) && maze[nX + 1 + nO][nX + 1] === 0);
+        let canNudgeLeft = (nX - 1 >= 0 && (nX - 1 + nO >= 0 && nX - 1 + nO < gridSize) && maze[nX - 1 + nO][nX - 1] === 0);
+
+        if (canNudgeRight) {
+            nX++; // Slide forward
+            isBlocked = false;
+        } else if (canNudgeLeft) {
+            nX--; // Slide backward
+            isBlocked = false;
+        }
+    }
+
+    if(!isBlocked) {
+        playerX = nX; 
+        offset = nO;
+    } else {
+        playMerp();
+        // Visual feedback for the "Bonk"
+        const pScale = isShiftAction ? 'scaleY(0.4)' : 'scaleX(0.4)';
+        // We'll need a way to trigger this on the canvas-based player, 
+        // for now let's just use the sound and skip the transform or 
+        // re-render with a 'squish' flag.
+    }
+
+    render1D(); 
+    draw2D();
+    
+    // Win Condition
+    if(playerX === gridSize-1 && (playerX + offset === gridSize-1)) {
+        alert("SCAN COMPLETE. TARGET SECURED."); 
+        isBuilding = true;
+        mapContainer.classList.remove('collapsed');
+        document.getElementById('runUI').classList.add('hidden');
+        initMaze(gridSize);
+    }
+};
+
+window.onkeyup = e => { if(e.key.toLowerCase() === 'p' && !isBuilding) mapContainer.classList.add('collapsed'); };
+
+// Boot
+initMaze(16);
+</script>
+</body>
+</html>
