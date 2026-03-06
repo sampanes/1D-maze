@@ -1,280 +1,1484 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>1D Dimensional Scanner - Precision Edition</title>
-    <style>
-        :root { --accent: #00ffcc; --bg: #0a0a0a; --panel: #1b1b1b; }
-        body { background: var(--bg); color: #e0e0e0; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; padding: 20px; user-select: none; overflow: hidden; }
-        
-        #mapContainer { 
-            height: 512px; overflow: hidden; transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            border: 2px solid #333; background: #000; margin-bottom: 10px;
-        }
-        #mapContainer.collapsed { height: 0px; border-color: transparent; }
-        canvas { image-rendering: pixelated; cursor: crosshair; display: block; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diamond Maze Architect</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #151a36, #090b16 55%);
+      color: #e7ecff;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow-x: hidden;
+    }
 
-        .controls { background: var(--panel); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #333; text-align: center; width: 512px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        .slider-group { margin: 10px 0; font-size: 0.8em; color: var(--accent); letter-spacing: 1px; }
-        input[type=range] { width: 200px; accent-color: var(--accent); vertical-align: middle; cursor: pointer; }
+    .header {
+      text-align: center;
+      padding: 18px 12px 10px;
+      border-bottom: 1px solid rgba(88, 123, 255, 0.18);
+      background: linear-gradient(180deg, rgba(17, 25, 56, 0.95), rgba(10, 14, 28, 0.92));
+      backdrop-filter: blur(10px);
+    }
+    .header h1 {
+      margin: 0 0 6px;
+      font-size: clamp(1.4rem, 2vw, 2rem);
+      letter-spacing: 0.05em;
+      color: #7afcff;
+      text-shadow: 0 0 16px rgba(0, 217, 245, 0.25);
+    }
+    .header p {
+      margin: 0;
+      font-size: 0.88rem;
+      color: #9bb0d9;
+    }
 
-        button { padding: 10px 20px; cursor: pointer; background: var(--accent); border: none; color: #000; font-weight: bold; border-radius: 4px; transition: 0.2s; text-transform: uppercase; }
-        button:disabled { background: #333; color: #666; cursor: not-allowed; }
-        button:hover:not(:disabled) { filter: brightness(1.2); box-shadow: 0 0 15px var(--accent); }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 12px;
+      background: rgba(8, 11, 23, 0.9);
+      border-bottom: 1px solid rgba(88, 123, 255, 0.14);
+    }
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 999px;
+      padding: 8px 12px;
+    }
+    .control-group label {
+      font-size: 0.82rem;
+      color: #a9badf;
+    }
+    .control-group input[type="range"] {
+      width: 120px;
+      accent-color: #00d9f5;
+    }
+    .val {
+      min-width: 28px;
+      text-align: center;
+      color: #7afcff;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
 
-        #runUI { text-align: center; }
-        /* 1D Viewport */
-        #canvas1D { border: 4px solid #333; background: #050505; margin-top: 10px; box-shadow: inset 0 0 20px #000; }
-        
-        .status { color: var(--accent); font-size: 0.9em; margin-top: 10px; height: 1.2em; text-transform: uppercase; text-shadow: 0 0 5px var(--accent); }
-        .hint { font-size: 0.75em; color: #555; margin-top: 20px; line-height: 1.4; }
-        .hidden { display: none; }
-    </style>
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 10px 16px;
+      cursor: pointer;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+    }
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .btn-wipe { background: linear-gradient(135deg, #ff6767, #e23434); color: white; }
+    .btn-validate { background: linear-gradient(135deg, #ffc24c, #ff8b2b); color: #171717; }
+    .btn-scan { background: linear-gradient(135deg, #5dffb0, #00d9f5); color: #061018; }
+    .btn-back { background: linear-gradient(135deg, #8a76ff, #635bff); color: white; }
+
+    .status-bar {
+      text-align: center;
+      padding: 8px 12px;
+      min-height: 34px;
+      font-size: 0.84rem;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .status-bar.neutral { background: rgba(255,255,255,0.03); color: #9db1d8; }
+    .status-bar.success { background: rgba(33, 150, 83, 0.18); color: #73ffba; }
+    .status-bar.error { background: rgba(255, 76, 76, 0.16); color: #ff8f8f; }
+    .status-bar.info { background: rgba(0, 217, 245, 0.14); color: #87f7ff; }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 18px;
+      justify-content: center;
+      padding: 10px 12px;
+      color: #9fb1d8;
+      font-size: 0.78rem;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,0.18);
+    }
+
+    .maze-section {
+      overflow: hidden;
+      max-height: 1800px;
+      opacity: 1;
+      transition: max-height 0.55s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+    }
+    .maze-section.collapsed {
+      max-height: 0;
+      opacity: 0;
+    }
+    .maze-section.peek {
+      max-height: 1800px;
+      opacity: 1;
+    }
+
+    .canvas-wrapper {
+      min-height: 640px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 56px 10px 72px;
+      overflow: visible;
+    }
+    .diamond-container {
+      position: relative;
+      transform: rotate(-45deg);
+      transform-origin: center center;
+      line-height: 0;
+      filter: drop-shadow(0 0 24px rgba(0, 217, 245, 0.12));
+    }
+    .diamond-container canvas {
+      display: block;
+      background: #11162c;
+      border: 2px solid rgba(124, 144, 255, 0.22);
+    }
+    .diamond-label {
+      position: absolute;
+      transform: rotate(45deg);
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      pointer-events: none;
+      text-shadow: 0 0 10px rgba(0,0,0,0.55);
+      white-space: nowrap;
+    }
+    .start-label { color: #5dffb0; }
+    .end-label { color: #ff6a6a; }
+
+    .peek-hint {
+      display: none;
+      text-align: center;
+      padding: 10px 12px 0;
+      color: #b6a8ff;
+      font-size: 0.84rem;
+    }
+    .peek-hint.active { display: block; }
+    .peek-hint kbd,
+    .scan-help kbd {
+      background: #1f2545;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      padding: 2px 7px;
+      color: #f4f7ff;
+      font-family: inherit;
+      font-weight: 700;
+    }
+
+    .scan-section {
+      display: none;
+      padding: 18px 14px 28px;
+      text-align: center;
+    }
+    .scan-section.active { display: block; }
+    .scan-section h2 {
+      margin: 0 0 8px;
+      font-size: 1.15rem;
+      color: #7afcff;
+    }
+    .scan-section p {
+      margin: 0 0 14px;
+      color: #9db1d8;
+      font-size: 0.82rem;
+    }
+    .scan-shell {
+      max-width: 940px;
+      margin: 0 auto;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+      padding: 16px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+    }
+    .scan-canvas-wrap {
+      display: flex;
+      justify-content: center;
+    }
+    .scan-canvas-wrap canvas {
+      width: min(100%, 900px);
+      height: auto;
+      display: block;
+      background: linear-gradient(180deg, rgba(7, 12, 25, 1), rgba(6, 8, 18, 1));
+      border: 2px solid rgba(124, 144, 255, 0.18);
+      border-radius: 16px;
+      box-shadow: 0 0 28px rgba(0, 217, 245, 0.08), inset 0 0 24px rgba(255,255,255,0.03);
+    }
+    .scan-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      align-items: center;
+      margin-top: 14px;
+    }
+    .scan-readout {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 10px 12px;
+      color: #dce5ff;
+      font-size: 0.84rem;
+    }
+    .scan-help {
+      margin-top: 12px;
+      color: #9db1d8;
+      font-size: 0.8rem;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 700px) {
+      .canvas-wrapper { min-height: 520px; padding: 42px 8px 56px; }
+      .controls { gap: 10px; }
+      .control-group { padding: 8px 10px; }
+    }
+  </style>
 </head>
 <body>
+  <div class="header">
+    <h1>◆ Diamond Maze Architect ◆</h1>
+    <p>Paint a diamond maze, validate it with BFS, then navigate it with a granular 1D shadow scanner using continuous u,v coordinates.</p>
+  </div>
 
-    <div class="controls">
-        <div class="slider-group">
-            GRID SCALE: <span id="resVal">16x16</span> 
-            <input type="range" id="resSlider" min="8" max="123" value="16">
+  <div class="controls">
+    <div class="control-group">
+      <label for="gridSlider">Grid Size</label>
+      <input id="gridSlider" type="range" min="8" max="64" value="16" step="2" />
+      <span class="val" id="gridVal">16</span>
+    </div>
+    <button id="btnWipe" class="btn-wipe">Wipe</button>
+    <button id="btnValidate" class="btn-validate">Validate Path</button>
+    <button id="btnScan" class="btn-scan" disabled>Start Scan</button>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-swatch" style="background:#5dffb0"></div>Start</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#ff6a6a"></div>End</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#f2f5ff"></div>Path</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#0d1018"></div>Wall</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#00d9f5"></div>Scanner Line</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#ffd84f"></div>BFS Solution</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#7dff2e"></div>Avatar</div>
+  </div>
+
+  <div id="statusBar" class="status-bar neutral">Click and drag on the diamond to paint walls. Right-click or hold Shift to erase.</div>
+
+  <div id="mazeSection" class="maze-section">
+    <div class="canvas-wrapper">
+      <div id="diamondContainer" class="diamond-container">
+        <canvas id="mazeCanvas"></canvas>
+        <div id="startLabel" class="diamond-label start-label">◀ START</div>
+        <div id="endLabel" class="diamond-label end-label">END ▶</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="peekHint" class="peek-hint">Hold <kbd>P</kbd> to peek at the 2D diamond while scanning.</div>
+
+  <div id="scanSection" class="scan-section">
+    <h2>1D Shadow Scanner</h2>
+    <p><strong>Up/Down</strong> changes <strong>u</strong> and moves the horizontal cyan scan-line up/down the diamond. <strong>Left/Right</strong> changes <strong>v</strong> and moves your avatar laterally along that exact slice.</p>
+
+    <div class="scan-shell">
+      <div class="scan-canvas-wrap">
+        <canvas id="scanCanvas" width="900" height="320"></canvas>
+      </div>
+
+      <div class="scan-controls">
+        <button id="btnBack" class="btn-back">← Back to Architect</button>
+        <div class="scan-readout">
+          <span id="rowReadout">u: 0.00</span>
+          <span id="colReadout">v: 1.00</span>
+          <span id="cellReadout">Cell: START</span>
         </div>
-        <button id="modeBtn" disabled>START SCAN</button>
-        <button id="clearBtn" style="background:#444; color:#fff; margin-left: 8px;">WIPE</button>
-        <div id="status" class="status">CREATE PATH: GREEN TO RED</div>
+      </div>
+
+      <div class="scan-help">
+        <div>Controls: <kbd>←</kbd> <kbd>→</kbd> move along the current scan-line, <kbd>↑</kbd> <kbd>↓</kbd> move the scan-line through the diamond, <kbd>P</kbd> peeks the 2D diamond.</div>
+        <div>The 1D viewport samples the angled slice directly from the 2D grid, so walls grow and shrink smoothly as the line cuts through them.</div>
+      </div>
     </div>
+  </div>
 
-    <div id="mapContainer">
-        <canvas id="mazeCanvas" width="512" height="512"></canvas>
-    </div>
+  <script>
+    let gridSize = 16;
+    let grid = [];
+    let bfsPath = null;
+    let solvable = false;
 
-    <div id="runUI" class="hidden">
-        <canvas id="canvas1D" width="512" height="80"></canvas>
-        <div class="status">HOLD [P] TO PEEK BLUEPRINT</div>
-        <p class="hint">ARROW KEYS: MOVE/SHIFT | 'P' KEY: SHOW MAP<br>TIP: Diagonal movement prevents corner sticking.</p>
-    </div>
+    let cellSize = 24;
+    let canvasSize = 384;
 
-<script>
-let gridSize = 16;
-let cellSize = 512 / gridSize;
-let maze = [];
-let isBuilding = true, isPeeking = false, isDragging = false, brushType = 1;
-let playerX = 0, offset = 0;
+    let painting = false;
+    let paintMode = 1;
 
-const canvas = document.getElementById('mazeCanvas');
-const ctx = canvas.getContext('2d');
-const canvas1D = document.getElementById('canvas1D');
-const ctx1D = canvas1D.getContext('2d');
-const mapContainer = document.getElementById('mapContainer');
-const resSlider = document.getElementById('resSlider');
-const modeBtn = document.getElementById('modeBtn');
-const clearBtn = document.getElementById('clearBtn');
+    let scanActive = false;
+    let peeking = false;
+    let player = { u: 0, v: 1 };
+    let avatarSquish = 0;
+    let celebrateUntil = 0;
+    let winResetHandle = null;
+    const keysDown = {};
 
-/** INITIALIZE MAZE **/
-function initMaze(size) {
-    gridSize = size;
-    cellSize = 512 / gridSize;
-    maze = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
-    playerX = 0; 
-    offset = 0;
-    modeBtn.disabled = !isSolvable();
-    draw2D();
-}
+    const EPS = 0.035;
+    const MOVE_SPEED_V = 6.5; // per second
+    const MOVE_SPEED_U = 5.2; // per second
+    const NUDGE_OFFSETS = [0.06, -0.06, 0.12, -0.12, 0.18, -0.18, 0.26, -0.26];
+    const SAMPLE_SUBDIVISIONS = 5;
 
-/** AUDIO **/
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-function playMerp() {
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(70, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.1);
-    gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
-}
+    let audioCtx = null;
+    let lastFrameTime = performance.now();
 
-/** PATHFINDING (BFS) **/
-function isSolvable() {
-    let q = [[0, 0]], v = new Set(['0,0']);
-    while(q.length > 0) {
-        let [x, y] = q.shift();
-        if(x === gridSize-1 && y === gridSize-1) return true;
-        [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
-            let nx = x + dx, ny = y + dy;
-            if(nx>=0 && nx<gridSize && ny>=0 && ny<gridSize && maze[ny][nx]===0 && !v.has(`${nx},${ny}`)) {
-                v.add(`${nx},${ny}`); q.push([nx, ny]);
-            }
+    const mazeCanvas = document.getElementById('mazeCanvas');
+    const mazeCtx = mazeCanvas.getContext('2d');
+    const scanCanvas = document.getElementById('scanCanvas');
+    const scanCtx = scanCanvas.getContext('2d');
+
+    const diamondContainer = document.getElementById('diamondContainer');
+    const startLabel = document.getElementById('startLabel');
+    const endLabel = document.getElementById('endLabel');
+
+    const mazeSection = document.getElementById('mazeSection');
+    const scanSection = document.getElementById('scanSection');
+    const peekHint = document.getElementById('peekHint');
+    const statusBar = document.getElementById('statusBar');
+
+    const gridSlider = document.getElementById('gridSlider');
+    const gridVal = document.getElementById('gridVal');
+    const btnWipe = document.getElementById('btnWipe');
+    const btnValidate = document.getElementById('btnValidate');
+    const btnScan = document.getElementById('btnScan');
+    const btnBack = document.getElementById('btnBack');
+
+    const rowReadout = document.getElementById('rowReadout');
+    const colReadout = document.getElementById('colReadout');
+    const cellReadout = document.getElementById('cellReadout');
+
+    function setStatus(message, type = 'neutral') {
+      statusBar.textContent = message;
+      statusBar.className = 'status-bar ' + type;
+    }
+
+    function initGrid() {
+      grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(0));
+      bfsPath = null;
+      solvable = false;
+      btnScan.disabled = true;
+    }
+
+    function resetScannerState() {
+      player.u = 0;
+      player.v = 1;
+      avatarSquish = 0;
+      celebrateUntil = 0;
+      if (winResetHandle) {
+        clearTimeout(winResetHandle);
+        winResetHandle = null;
+      }
+    }
+
+    function computeSizes() {
+      const maxDim = Math.min(window.innerWidth * 0.66, 560);
+      canvasSize = Math.max(240, Math.floor(maxDim / Math.SQRT2));
+      cellSize = canvasSize / gridSize;
+
+      mazeCanvas.width = canvasSize;
+      mazeCanvas.height = canvasSize;
+      diamondContainer.style.width = canvasSize + 'px';
+      diamondContainer.style.height = canvasSize + 'px';
+      diamondContainer.style.margin = '24px';
+
+      startLabel.style.left = (-64) + 'px';
+      startLabel.style.top = (cellSize * 0.42) + 'px';
+      endLabel.style.right = (-56) + 'px';
+      endLabel.style.bottom = (cellSize * 0.42) + 'px';
+    }
+
+    function setup() {
+      gridSize = parseInt(gridSlider.value, 10);
+      gridVal.textContent = gridSize;
+      initGrid();
+      resetScannerState();
+      computeSizes();
+      drawMaze();
+      drawScanView(performance.now());
+      setStatus('Click and drag on the diamond to paint walls. Right-click or hold Shift to erase.', 'neutral');
+    }
+
+    function isStart(r, c) {
+      return r === 0 && c === 0;
+    }
+
+    function isEnd(r, c) {
+      return r === gridSize - 1 && c === gridSize - 1;
+    }
+
+    function roundRectPath(ctx, x, y, w, h, r) {
+      const radius = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + w - radius, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+      ctx.lineTo(x + w, y + h - radius);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+      ctx.lineTo(x + radius, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    }
+
+    function uvToXY(u, v) {
+      return {
+        x: (u + v) / 2,
+        y: (v - u) / 2
+      };
+    }
+
+    function getVBounds(u) {
+      const absU = Math.abs(u);
+      return {
+        min: absU,
+        max: 2 * gridSize - absU
+      };
+    }
+
+    function clampU(u) {
+      const limit = gridSize - EPS;
+      return Math.max(-limit, Math.min(limit, u));
+    }
+
+    function clampV(u, v) {
+      const bounds = getVBounds(u);
+      return Math.max(bounds.min + EPS, Math.min(bounds.max - EPS, v));
+    }
+
+    function pointInsideDiamond(u, v) {
+      const { x, y } = uvToXY(u, v);
+      return x >= 0 && x < gridSize && y >= 0 && y < gridSize;
+    }
+
+    function getCellInfoAtUV(u, v) {
+      const { x, y } = uvToXY(u, v);
+      if (!(x >= 0 && x < gridSize && y >= 0 && y < gridSize)) return null;
+
+      const col = Math.max(0, Math.min(gridSize - 1, Math.floor(x)));
+      const row = Math.max(0, Math.min(gridSize - 1, Math.floor(y)));
+      const key = row + ',' + col;
+
+      return {
+        row,
+        col,
+        key,
+        x,
+        y,
+        wall: grid[row][col] === 1,
+        start: isStart(row, col),
+        end: isEnd(row, col),
+        solution: !!(bfsPath && bfsPath.has(key))
+      };
+    }
+
+    function getCellLabel(info) {
+      if (!info) return 'VOID';
+      if (info.start) return 'START';
+      if (info.end) return 'END';
+      if (info.wall) return 'WALL';
+      if (info.solution) return 'BFS PATH';
+      return 'PATH';
+    }
+
+    function isWallAtUV(u, v) {
+      const info = getCellInfoAtUV(u, v);
+      return !info || info.wall;
+    }
+
+    function getBoundaryGap(u, v) {
+      const bounds = getVBounds(u);
+      return Math.min(v - bounds.min, bounds.max - v);
+    }
+
+    function isNearBoundary(u, v, margin = EPS * 1.35) {
+      return getBoundaryGap(u, v) <= margin;
+    }
+
+    function isSegmentClear(u0, v0, u1, v1, steps = 8) {
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const u = u0 + (u1 - u0) * t;
+        const v = v0 + (v1 - v0) * t;
+        if (!pointInsideDiamond(u, v) || isWallAtUV(u, v)) return false;
+      }
+      return true;
+    }
+
+    function getScannerEndpoints(u) {
+      const N = gridSize;
+      if (u >= 0) {
+        return {
+          x0: u,
+          y0: 0,
+          x1: N,
+          y1: N - u
+        };
+      }
+      return {
+        x0: 0,
+        y0: -u,
+        x1: N + u,
+        y1: N
+      };
+    }
+
+    function drawMaze(pathSet = null, drawScanner = false) {
+      mazeCtx.clearRect(0, 0, canvasSize, canvasSize);
+
+      for (let r = 0; r < gridSize; r++) {
+        for (let c = 0; c < gridSize; c++) {
+          const x = c * cellSize;
+          const y = r * cellSize;
+
+          if (isStart(r, c)) {
+            mazeCtx.fillStyle = '#5dffb0';
+          } else if (isEnd(r, c)) {
+            mazeCtx.fillStyle = '#ff6a6a';
+          } else if (pathSet && pathSet.has(r + ',' + c)) {
+            mazeCtx.fillStyle = '#ffd84f';
+          } else if (grid[r][c] === 1) {
+            mazeCtx.fillStyle = '#0c0f18';
+          } else {
+            mazeCtx.fillStyle = '#f2f5ff';
+          }
+
+          mazeCtx.fillRect(x, y, cellSize + 0.5, cellSize + 0.5);
+          mazeCtx.strokeStyle = 'rgba(97, 118, 191, 0.45)';
+          mazeCtx.lineWidth = 0.75;
+          mazeCtx.strokeRect(x, y, cellSize, cellSize);
+        }
+      }
+
+      if (drawScanner && scanActive) {
+        const line = getScannerEndpoints(player.u);
+        mazeCtx.save();
+        mazeCtx.strokeStyle = 'rgba(0, 217, 245, 0.26)';
+        mazeCtx.lineWidth = Math.max(8, cellSize * 1.05);
+        mazeCtx.lineCap = 'round';
+        mazeCtx.beginPath();
+        mazeCtx.moveTo(line.x0 * cellSize, line.y0 * cellSize);
+        mazeCtx.lineTo(line.x1 * cellSize, line.y1 * cellSize);
+        mazeCtx.stroke();
+
+        mazeCtx.strokeStyle = '#00d9f5';
+        mazeCtx.shadowColor = '#00d9f5';
+        mazeCtx.shadowBlur = 12;
+        mazeCtx.lineWidth = Math.max(3, cellSize * 0.22);
+        mazeCtx.beginPath();
+        mazeCtx.moveTo(line.x0 * cellSize, line.y0 * cellSize);
+        mazeCtx.lineTo(line.x1 * cellSize, line.y1 * cellSize);
+        mazeCtx.stroke();
+        mazeCtx.restore();
+
+        const { x, y } = uvToXY(player.u, player.v);
+        const bounds = getVBounds(player.u);
+        const leftGap = player.v - bounds.min;
+        const rightGap = bounds.max - player.v;
+        const edgeBias = Math.max(-1, Math.min(1, (leftGap - rightGap) / Math.max(0.001, leftGap + rightGap)));
+        const inwardNormalX = Math.SQRT1_2 * edgeBias;
+        const inwardNormalY = -Math.SQRT1_2 * edgeBias;
+        const offsetMag = Math.min(cellSize * 0.16, Math.max(0, cellSize * 0.16 * Math.abs(edgeBias)));
+        const cx = x * cellSize + inwardNormalX * offsetMag;
+        const cy = y * cellSize + inwardNormalY * offsetMag;
+        const radius = Math.max(4, cellSize * 0.28);
+
+        mazeCtx.save();
+        mazeCtx.strokeStyle = 'rgba(125, 255, 46, 0.4)';
+        mazeCtx.lineWidth = 1.5;
+        const crossSize = cellSize * 0.44;
+        mazeCtx.beginPath();
+        mazeCtx.moveTo(cx - crossSize, cy);
+        mazeCtx.lineTo(cx + crossSize, cy);
+        mazeCtx.moveTo(cx, cy - crossSize);
+        mazeCtx.lineTo(cx, cy + crossSize);
+        mazeCtx.stroke();
+
+        mazeCtx.fillStyle = '#7dff2e';
+        mazeCtx.shadowColor = '#7dff2e';
+        mazeCtx.shadowBlur = 16;
+        mazeCtx.beginPath();
+        mazeCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+        mazeCtx.fill();
+        mazeCtx.fillStyle = '#0c1205';
+        mazeCtx.beginPath();
+        mazeCtx.arc(cx, cy, Math.max(2, radius * 0.38), 0, Math.PI * 2);
+        mazeCtx.fill();
+        mazeCtx.restore();
+      }
+    }
+
+    function screenToCanvas(mouseX, mouseY) {
+      const rect = mazeCanvas.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+
+      const dx = mouseX - cx;
+      const dy = mouseY - cy;
+
+      const angle = Math.PI / 4;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+
+      const localX = dx * cos - dy * sin;
+      const localY = dx * sin + dy * cos;
+
+      const expectedWidth = canvasSize * Math.SQRT2;
+      const scale = rect.width / expectedWidth;
+
+      return {
+        x: localX / scale + canvasSize / 2,
+        y: localY / scale + canvasSize / 2
+      };
+    }
+
+    function canvasToGrid(x, y) {
+      const col = Math.floor(x / cellSize);
+      const row = Math.floor(y / cellSize);
+      if (row < 0 || col < 0 || row >= gridSize || col >= gridSize) return null;
+      return { row, col };
+    }
+
+    function paintAt(clientX, clientY) {
+      const point = screenToCanvas(clientX, clientY);
+      const cell = canvasToGrid(point.x, point.y);
+      if (!cell) return;
+
+      const { row, col } = cell;
+      if (isStart(row, col) || isEnd(row, col)) return;
+
+      grid[row][col] = paintMode;
+      bfsPath = null;
+      solvable = false;
+      btnScan.disabled = true;
+      drawMaze();
+      if (scanActive) drawScanView(performance.now());
+    }
+
+    mazeCanvas.addEventListener('mousedown', (e) => {
+      if (scanActive) return;
+      e.preventDefault();
+      painting = true;
+      paintMode = (e.button === 2 || e.shiftKey) ? 0 : 1;
+      paintAt(e.clientX, e.clientY);
+    });
+
+    mazeCanvas.addEventListener('mousemove', (e) => {
+      if (!painting || scanActive) return;
+      paintAt(e.clientX, e.clientY);
+    });
+
+    ['mouseup', 'mouseleave'].forEach(type => {
+      mazeCanvas.addEventListener(type, () => painting = false);
+    });
+
+    mazeCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    mazeCanvas.addEventListener('touchstart', (e) => {
+      if (scanActive) return;
+      e.preventDefault();
+      painting = true;
+      paintMode = 1;
+      const touch = e.touches[0];
+      paintAt(touch.clientX, touch.clientY);
+    }, { passive: false });
+
+    mazeCanvas.addEventListener('touchmove', (e) => {
+      if (!painting || scanActive) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      paintAt(touch.clientX, touch.clientY);
+    }, { passive: false });
+
+    mazeCanvas.addEventListener('touchend', () => painting = false);
+
+    function bfs() {
+      if (grid[0][0] === 1 || grid[gridSize - 1][gridSize - 1] === 1) return null;
+
+      const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+      const visited = Array.from({ length: gridSize }, () => Array(gridSize).fill(false));
+      const parent = Array.from({ length: gridSize }, () => Array(gridSize).fill(null));
+      const queue = [{ r: 0, c: 0 }];
+      visited[0][0] = true;
+
+      while (queue.length) {
+        const current = queue.shift();
+        if (current.r === gridSize - 1 && current.c === gridSize - 1) {
+          const path = new Set();
+          let cur = current;
+          while (cur) {
+            path.add(cur.r + ',' + cur.c);
+            cur = parent[cur.r][cur.c];
+          }
+          return path;
+        }
+
+        for (const [dr, dc] of dirs) {
+          const nr = current.r + dr;
+          const nc = current.c + dc;
+          if (nr < 0 || nc < 0 || nr >= gridSize || nc >= gridSize) continue;
+          if (visited[nr][nc] || grid[nr][nc] === 1) continue;
+          visited[nr][nc] = true;
+          parent[nr][nc] = current;
+          queue.push({ r: nr, c: nc });
+        }
+      }
+
+      return null;
+    }
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return null;
+        audioCtx = new Ctx();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function playMerp() {
+      try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(210, now);
+        osc.frequency.exponentialRampToValueAtTime(116, now + 0.15);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.08, now + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.17);
+      } catch (_) {}
+    }
+
+    function playCelebrate() {
+      try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const notes = [330, 494, 659];
+        const now = ctx.currentTime;
+        notes.forEach((freq, index) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + index * 0.08);
+          gain.gain.setValueAtTime(0.0001, now + index * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.07, now + index * 0.08 + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.08 + 0.22);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + index * 0.08);
+          osc.stop(now + index * 0.08 + 0.24);
         });
+      } catch (_) {}
     }
-    return false;
-}
 
-/** DRAWING 2D **/
-function draw2D() {
-    ctx.clearRect(0, 0, 512, 512);
-    for(let y=0; y<gridSize; y++) {
-        for(let x=0; x<gridSize; x++) {
-            if(x===0 && y===0) ctx.fillStyle = '#2ecc71';
-            else if(x===gridSize-1 && y===gridSize-1) ctx.fillStyle = '#e74c3c';
-            else ctx.fillStyle = maze[y][x] === 1 ? '#000' : '#fff';
-            
-            // Draw Cell
-            ctx.fillRect(x*cellSize, (gridSize-1-y)*cellSize, cellSize, cellSize);
-            
-            // Draw subtle grid lines if scale is small enough
-            if(gridSize < 50) {
-                ctx.strokeStyle = 'rgba(0,0,0,0.05)';
-                ctx.lineWidth = 1;
-                ctx.strokeRect(x*cellSize, (gridSize-1-y)*cellSize, cellSize, cellSize);
-            }
-        }
+    function updateScanReadout() {
+      const info = getCellInfoAtUV(player.u, player.v);
+      rowReadout.textContent = 'u: ' + player.u.toFixed(2);
+      colReadout.textContent = 'v: ' + player.v.toFixed(2);
+      if (info) {
+        cellReadout.textContent = 'Cell: ' + getCellLabel(info) + ' [' + info.row + ',' + info.col + ']';
+      } else {
+        cellReadout.textContent = 'Cell: VOID';
+      }
     }
-    
-    if(!isBuilding) {
-        // High Vis Scanline
-        ctx.strokeStyle = '#00ffcc'; 
-        ctx.lineWidth = Math.max(1.5, 6 - (gridSize/25));
+
+    function sampleSliceColumn(u, vStart, vEnd) {
+      const tally = { wall: 0, start: 0, end: 0, solution: 0, open: 0, total: 0 };
+      for (let i = 0; i < SAMPLE_SUBDIVISIONS; i++) {
+        const v = vStart + ((i + 0.5) / SAMPLE_SUBDIVISIONS) * (vEnd - vStart);
+        const info = getCellInfoAtUV(u, v);
+        if (!info) continue;
+        tally.total++;
+        if (info.wall) tally.wall++;
+        else if (info.end) tally.end++;
+        else if (info.start) tally.start++;
+        else if (info.solution) tally.solution++;
+        else tally.open++;
+      }
+      return tally;
+    }
+
+    function drawScanView(now = performance.now()) {
+      updateScanReadout();
+
+      const ctx = scanCtx;
+      const w = scanCanvas.width;
+      const h = scanCanvas.height;
+      const N = gridSize;
+      const totalV = 2 * N;
+      const padX = 34;
+      const usableW = w - padX * 2;
+      const centerY = Math.floor(h * 0.62);
+      const laneH = 86;
+      const laneTop = centerY - laneH / 2;
+      const lineY = centerY;
+      const bounds = getVBounds(player.u);
+      const laneLeft = padX + (bounds.min / totalV) * usableW;
+      const laneRight = padX + (bounds.max / totalV) * usableW;
+      const avatarX = padX + (player.v / totalV) * usableW;
+      const pulse = 0.5 + 0.5 * Math.sin(now * 0.008);
+
+      ctx.clearRect(0, 0, w, h);
+
+      const bg = ctx.createLinearGradient(0, 0, 0, h);
+      bg.addColorStop(0, '#091121');
+      bg.addColorStop(1, '#060912');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, w, h);
+
+      const ambient = ctx.createRadialGradient(w / 2, centerY, 20, w / 2, centerY, w * 0.52);
+      ambient.addColorStop(0, 'rgba(0, 217, 245, 0.12)');
+      ambient.addColorStop(1, 'rgba(0, 217, 245, 0)');
+      ctx.fillStyle = ambient;
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.fillStyle = '#7afcff';
+      ctx.font = 'bold 15px monospace';
+      ctx.fillText('1D SHADOW SCANNER', 28, 28);
+      ctx.fillStyle = '#9db1d8';
+      ctx.font = '12px monospace';
+      ctx.fillText('u=' + player.u.toFixed(2) + '   v=' + player.v.toFixed(2), 28, 48);
+
+      ctx.textAlign = 'right';
+      ctx.fillText('sampled along x-y=u', w - 28, 28);
+      ctx.fillText('global v axis: 0 → ' + totalV.toFixed(0), w - 28, 48);
+      ctx.textAlign = 'left';
+
+      ctx.strokeStyle = 'rgba(120, 145, 215, 0.20)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padX, lineY);
+      ctx.lineTo(w - padX, lineY);
+      ctx.stroke();
+
+      const tickStep = gridSize <= 24 ? 1 : 2;
+      for (let t = 0; t <= totalV; t += tickStep) {
+        const x = padX + (t / totalV) * usableW;
+        ctx.strokeStyle = t % 2 === 0 ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)';
         ctx.beginPath();
-        ctx.moveTo(0, (gridSize - 1 - offset) * cellSize + (cellSize/2));
-        ctx.lineTo(512, (gridSize - 1 - (gridSize - 1 + offset)) * cellSize + (cellSize/2));
+        ctx.moveTo(x, centerY + laneH / 2 + 6);
+        ctx.lineTo(x, centerY + laneH / 2 + 14);
         ctx.stroke();
-    }
-}
+      }
 
-/** DRAWING 1D (Canvas-based for sub-pixel precision) **/
-function render1D() {
-    ctx1D.clearRect(0, 0, 512, 80);
-    const bW = 512 / gridSize;
-    
-    for(let x=0; x<gridSize; x++) {
-        let y = x + offset;
-        let isWall = (y < 0 || y >= gridSize || maze[y][x] === 1);
-        
-        if(x === 0 && y === 0) ctx1D.fillStyle = '#2ecc71';
-        else if(x === gridSize-1 && y === gridSize-1) ctx1D.fillStyle = '#e74c3c';
-        else ctx1D.fillStyle = isWall ? '#000' : '#fff';
-        
-        // Math.ceil prevents the "tiny borders" / gaps between blocks
-        ctx1D.fillRect(x * bW, 0, Math.ceil(bW), 80);
-    }
-    
-    // Draw Player Needle
-    ctx1D.fillStyle = '#00ffcc';
-    const pW = Math.max(2, bW * 0.6);
-    const pX = (playerX * bW) + (bW - pW)/2;
-    ctx1D.shadowBlur = 10;
-    ctx1D.shadowColor = '#00ffcc';
-    ctx1D.fillRect(pX, 15, pW, 50);
-    ctx1D.shadowBlur = 0;
-}
+      ctx.fillStyle = 'rgba(255,255,255,0.03)';
+      roundRectPath(ctx, padX, laneTop, usableW, laneH, 18);
+      ctx.fill();
 
-/** INTERACTION **/
-canvas.onmousedown = e => {
-    if(!isBuilding) return;
-    isDragging = true;
-    const x = Math.floor(e.offsetX / cellSize), y = gridSize - 1 - Math.floor(e.offsetY / cellSize);
-    if(x>=0 && x<gridSize && y>=0 && y<gridSize) {
-        brushType = maze[y][x] === 0 ? 1 : 0;
-        paint(e);
-    }
-};
-window.onmouseup = () => isDragging = false;
-canvas.onmousemove = paint;
+      ctx.fillStyle = 'rgba(7, 13, 26, 0.90)';
+      if (laneLeft > padX) ctx.fillRect(padX, laneTop, laneLeft - padX, laneH);
+      if (laneRight < w - padX) ctx.fillRect(laneRight, laneTop, w - padX - laneRight, laneH);
 
-function paint(e) {
-    if(!isBuilding || !isDragging) return;
-    const x = Math.floor(e.offsetX / cellSize), y = gridSize - 1 - Math.floor(e.offsetY / cellSize);
-    if(x>=0 && x<gridSize && y>=0 && y<gridSize && !((x===0&&y===0)||(x===gridSize-1&&y===gridSize-1))) {
-        maze[y][x] = brushType; 
-        draw2D();
-        const ok = isSolvable();
-        modeBtn.disabled = !ok;
-        document.getElementById('status').innerText = ok ? "PATH VERIFIED." : "PATH BLOCKED!";
-    }
-}
+      const laneGrad = ctx.createLinearGradient(0, laneTop, 0, laneTop + laneH);
+      laneGrad.addColorStop(0, 'rgba(245, 248, 255, 0.95)');
+      laneGrad.addColorStop(1, 'rgba(218, 225, 245, 0.92)');
+      ctx.fillStyle = laneGrad;
+      roundRectPath(ctx, laneLeft, laneTop, Math.max(2, laneRight - laneLeft), laneH, 18);
+      ctx.fill();
 
-resSlider.oninput = () => {
-    const val = parseInt(resSlider.value);
-    document.getElementById('resVal').innerText = `${val}x${val}`;
-    initMaze(val);
-};
+      for (let px = Math.floor(laneLeft); px < Math.ceil(laneRight); px++) {
+        const v0 = ((px - padX) / usableW) * totalV;
+        const v1 = (((px + 1) - padX) / usableW) * totalV;
+        const sample = sampleSliceColumn(player.u, v0, v1);
+        if (!sample.total) continue;
 
-clearBtn.onclick = () => {
-    initMaze(gridSize); // Re-inits current grid size to 0s
-};
-
-modeBtn.onclick = () => {
-    isBuilding = !isBuilding;
-    mapContainer.classList.toggle('collapsed', !isBuilding);
-    document.getElementById('runUI').classList.toggle('hidden', isBuilding);
-    modeBtn.innerText = isBuilding ? "START SCAN" : "EDIT BLUEPRINT";
-    if(!isBuilding) render1D();
-    draw2D();
-};
-
-window.onkeydown = e => {
-    const key = e.key.toLowerCase();
-    if(key === 'p') mapContainer.classList.remove('collapsed');
-    if(isBuilding) return;
-    
-    let nX = playerX, nO = offset;
-    let isShiftAction = (e.key === "ArrowUp" || e.key === "ArrowDown");
-
-    if(e.key === "ArrowLeft") nX = Math.max(0, playerX - 1);
-    if(e.key === "ArrowRight") nX = Math.min(gridSize-1, playerX + 1);
-    if(e.key === "ArrowUp") nO = Math.min(gridSize-1, offset + 1);
-    if(e.key === "ArrowDown") nO = Math.max(-(gridSize-1), offset - 1);
-
-    // Initial check: is the intended move blocked?
-    let tY = nX + nO;
-    let isBlocked = (tY < 0 || tY >= gridSize || maze[tY][nX] === 1);
-
-    // --- NUDGE LOGIC ---
-    // If it's a Shift (Up/Down) and we are blocked, look for a side-opening
-    if (isBlocked && isShiftAction) {
-        let canNudgeRight = (nX + 1 < gridSize && (nX + 1 + nO >= 0 && nX + 1 + nO < gridSize) && maze[nX + 1 + nO][nX + 1] === 0);
-        let canNudgeLeft = (nX - 1 >= 0 && (nX - 1 + nO >= 0 && nX - 1 + nO < gridSize) && maze[nX - 1 + nO][nX - 1] === 0);
-
-        if (canNudgeRight) {
-            nX++; // Slide forward
-            isBlocked = false;
-        } else if (canNudgeLeft) {
-            nX--; // Slide backward
-            isBlocked = false;
+        if (sample.solution > 0 && sample.wall === 0) {
+          const a = sample.solution / sample.total;
+          ctx.fillStyle = 'rgba(255, 216, 79, ' + (0.18 + a * 0.35).toFixed(3) + ')';
+          ctx.fillRect(px, laneTop, 1, laneH);
         }
+        if (sample.start > 0 && sample.wall === 0) {
+          const a = sample.start / sample.total;
+          ctx.fillStyle = 'rgba(93, 255, 176, ' + (0.26 + a * 0.55).toFixed(3) + ')';
+          ctx.fillRect(px, laneTop, 1, laneH);
+        }
+        if (sample.end > 0 && sample.wall === 0) {
+          const a = sample.end / sample.total;
+          ctx.fillStyle = 'rgba(255, 106, 106, ' + (0.26 + a * 0.55).toFixed(3) + ')';
+          ctx.fillRect(px, laneTop, 1, laneH);
+        }
+        if (sample.wall > 0) {
+          const frac = sample.wall / sample.total;
+          const colH = laneH * (0.10 + frac * 0.90);
+          const y = centerY - colH / 2;
+          ctx.fillStyle = 'rgba(7, 9, 14, ' + (0.30 + frac * 0.70).toFixed(3) + ')';
+          ctx.fillRect(px, y, 1, colH);
+          if (frac > 0.5) {
+            ctx.fillStyle = 'rgba(255,255,255,0.05)';
+            ctx.fillRect(px, y, 1, 1);
+            ctx.fillRect(px, y + colH - 1, 1, 1);
+          }
+        }
+      }
+
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0, 217, 245, 0.30)';
+      ctx.lineWidth = 14;
+      ctx.beginPath();
+      ctx.moveTo(laneLeft, lineY);
+      ctx.lineTo(laneRight, lineY);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#00d9f5';
+      ctx.shadowColor = '#00d9f5';
+      ctx.shadowBlur = 24;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(laneLeft, lineY);
+      ctx.lineTo(laneRight, lineY);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = '#00d9f5';
+      ctx.beginPath();
+      ctx.moveTo(laneLeft - 15, lineY - 8);
+      ctx.lineTo(laneLeft - 4, lineY);
+      ctx.lineTo(laneLeft - 15, lineY + 8);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(laneRight + 15, lineY - 8);
+      ctx.lineTo(laneRight + 4, lineY);
+      ctx.lineTo(laneRight + 15, lineY + 8);
+      ctx.fill();
+
+      const squish = avatarSquish;
+      const scaleX = 1 + squish * 0.48;
+      const scaleY = 1 - squish * 0.30;
+      const bob = squish * 2.5 * pulse;
+      ctx.save();
+      ctx.translate(avatarX, lineY - bob);
+      ctx.scale(scaleX, scaleY);
+      ctx.fillStyle = '#7dff2e';
+      ctx.shadowColor = '#7dff2e';
+      ctx.shadowBlur = 20;
+      ctx.beginPath();
+      ctx.arc(0, 0, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#091002';
+      ctx.beginPath();
+      ctx.arc(0, 0, 4.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.fillStyle = '#9db1d8';
+      ctx.font = '12px monospace';
+      ctx.fillText('lane [' + bounds.min.toFixed(2) + ', ' + bounds.max.toFixed(2) + ']', 28, h - 24);
+      ctx.textAlign = 'right';
+      ctx.fillText('Use arrows • Hold P to peek', w - 28, h - 24);
+      ctx.textAlign = 'left';
+
+      if (performance.now() < celebrateUntil) {
+        const t = (celebrateUntil - performance.now()) / 1600;
+        const alpha = Math.max(0, Math.min(1, 1 - (t * 0.55)));
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = 'rgba(93, 255, 176, ' + (0.20 + alpha * 0.55).toFixed(3) + ')';
+        roundRectPath(ctx, w * 0.19, h * 0.20, w * 0.62, 70, 18);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0, 217, 245, ' + (0.35 + alpha * 0.45).toFixed(3) + ')';
+        ctx.lineWidth = 2;
+        roundRectPath(ctx, w * 0.19, h * 0.20, w * 0.62, 70, 18);
+        ctx.stroke();
+        ctx.fillStyle = '#ecfff8';
+        ctx.font = 'bold 28px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('SCAN COMPLETE', w / 2, h * 0.20 + 30);
+        ctx.font = '14px sans-serif';
+        ctx.fillStyle = '#d8ffee';
+        ctx.fillText('Red End cell acquired — resetting scanner...', w / 2, h * 0.20 + 54);
+        ctx.textAlign = 'left';
+      }
     }
 
-    if(!isBlocked) {
-        playerX = nX; 
-        offset = nO;
-    } else {
-        playMerp();
-        // Visual feedback for the "Bonk"
-        const pScale = isShiftAction ? 'scaleY(0.4)' : 'scaleX(0.4)';
-        // We'll need a way to trigger this on the canvas-based player, 
-        // for now let's just use the sound and skip the transform or 
-        // re-render with a 'squish' flag.
+    function triggerBlocked(message) {
+      avatarSquish = 1;
+      playMerp();
+      setStatus(message, 'error');
     }
 
-    render1D(); 
-    draw2D();
-    
-    // Win Condition
-    if(playerX === gridSize-1 && (playerX + offset === gridSize-1)) {
-        alert("SCAN COMPLETE. TARGET SECURED."); 
-        isBuilding = true;
-        mapContainer.classList.remove('collapsed');
-        document.getElementById('runUI').classList.add('hidden');
-        initMaze(gridSize);
+    function tryMoveTo(nextU, nextV, successMessage, nudged = false) {
+      nextU = clampU(nextU);
+      nextV = clampV(nextU, nextV);
+      if (!pointInsideDiamond(nextU, nextV)) return false;
+      if (isWallAtUV(nextU, nextV)) return false;
+      if (!isSegmentClear(player.u, player.v, nextU, nextV, 10)) return false;
+
+      player.u = nextU;
+      player.v = nextV;
+      if (!checkWin()) {
+        setStatus(successMessage || (nudged ? 'Greased nudge slipped around a corner.' : 'Scanner moved.'), 'info');
+      }
+      return true;
     }
-};
 
-window.onkeyup = e => { if(e.key.toLowerCase() === 'p' && !isBuilding) mapContainer.classList.add('collapsed'); };
+    function checkWin() {
+      const probes = [
+        [0, 0],
+        [0.03, 0],
+        [-0.03, 0],
+        [0, 0.03],
+        [0, -0.03]
+      ];
 
-// Boot
-initMaze(16);
-</script>
+      let hitEnd = false;
+      for (const [du, dv] of probes) {
+        const info = getCellInfoAtUV(player.u + du, player.v + dv);
+        if (info && info.end) {
+          hitEnd = true;
+          break;
+        }
+      }
+
+      if (hitEnd) {
+        celebrateUntil = performance.now() + 1600;
+        playCelebrate();
+        setStatus('Scan Complete! End cell reached. Resetting scanner...', 'success');
+        if (winResetHandle) clearTimeout(winResetHandle);
+        winResetHandle = setTimeout(() => {
+          stopScan('Scan Complete! Scanner reset. You can scan again or edit the maze.', 'success');
+          resetScannerState();
+          drawScanView(performance.now());
+        }, 1600);
+        return true;
+      }
+      return false;
+    }
+
+    // Check if position is blocked by outer boundary (treat as wall for sliding)
+    function isOutOfBounds(u, v) {
+      const bounds = getVBounds(u);
+      return v <= bounds.min + EPS || v >= bounds.max - EPS;
+    }
+
+    // Combined wall or boundary check
+    function isBlocked(u, v) {
+      if (!pointInsideDiamond(u, v)) return true;
+      if (isOutOfBounds(u, v)) return true;
+      return isWallAtUV(u, v);
+    }
+
+    function isCellWallOnly(u, v) {
+      if (!pointInsideDiamond(u, v)) return false;
+      const info = getCellInfoAtUV(u, v);
+      return !!(info && info.wall);
+    }
+
+    function canMoveTo(u0, v0, u1, v1, steps = 8) {
+      const dist = Math.hypot(u1 - u0, v1 - v0);
+      const dynamicSteps = Math.max(steps, Math.ceil(dist / 0.045));
+      for (let i = 1; i <= dynamicSteps; i++) {
+        const t = i / dynamicSteps;
+        const u = u0 + (u1 - u0) * t;
+        const v = v0 + (v1 - v0) * t;
+        if (isBlocked(u, v)) return false;
+      }
+      return true;
+    }
+
+    function attemptMoveLateral(delta) {
+      const desiredV = player.v + delta;
+      const clampedV = clampV(player.u, desiredV);
+
+      if (!isBlocked(player.u, clampedV) && canMoveTo(player.u, player.v, player.u, clampedV, 8)) {
+        player.v = clampedV;
+        checkWin();
+        setStatus('Lateral movement.', 'info');
+        return;
+      }
+
+      const sign = delta > 0 ? 1 : -1;
+      const directBlockedByBoundary = isNearBoundary(player.u, clampedV) || !pointInsideDiamond(player.u, clampedV);
+
+      // Try to preserve the intended lateral progress while sliding in u.
+      // This is especially important for the outer border so it feels identical to drawn walls.
+      const slideTargets = [0, ...NUDGE_OFFSETS];
+      for (const du of slideTargets) {
+        const nudgedU = clampU(player.u + du);
+        const nudgedV = clampV(nudgedU, desiredV);
+        if (!isBlocked(nudgedU, nudgedV) && canMoveTo(player.u, player.v, nudgedU, nudgedV, 10)) {
+          player.u = nudgedU;
+          player.v = nudgedV;
+          setStatus(du === 0 ? 'Exited into open space.' : 'Greased nudge along edge.', 'info');
+          checkWin();
+          return;
+        }
+      }
+
+      // If the full lateral move fails, keep as much of it as possible by binary searching
+      // the farthest reachable point. This prevents the "tiny invisible blocker" effect at ends.
+      let lo = 0;
+      let hi = 1;
+      let bestU = player.u;
+      let bestV = player.v;
+      for (let i = 0; i < 10; i++) {
+        const mid = (lo + hi) / 2;
+        const testV = clampV(player.u, player.v + delta * mid);
+        if (!isBlocked(player.u, testV) && canMoveTo(player.u, player.v, player.u, testV, 8)) {
+          bestV = testV;
+          lo = mid;
+        } else {
+          hi = mid;
+        }
+      }
+      if (Math.abs(bestV - player.v) > 0.0008) {
+        player.v = bestV;
+        setStatus('Sliding at edge.', 'info');
+        checkWin();
+        return;
+      }
+
+      // Last chance: if blocked by a wall or border, try a same-strength slide in u while retaining
+      // slight lateral motion in the requested direction.
+      const blendedOffsets = [...NUDGE_OFFSETS].sort((a, b) => Math.abs(a) - Math.abs(b));
+      for (const du of blendedOffsets) {
+        const testU = clampU(player.u + du);
+        const testV = clampV(testU, player.v + delta * 0.45);
+        if (!isBlocked(testU, testV) && canMoveTo(player.u, player.v, testU, testV, 10)) {
+          player.u = testU;
+          player.v = testV;
+          setStatus(directBlockedByBoundary ? 'Border slide.' : 'Corner slide.', 'info');
+          checkWin();
+          return;
+        }
+      }
+
+      triggerBlocked('Merp — Wall collision.');
+    }
+
+    function attemptMoveVertical(delta) {
+      const desiredU = clampU(player.u + delta);
+      const bounds = getVBounds(desiredU);
+
+      let nextV = clampV(desiredU, player.v);
+
+      if (!isBlocked(desiredU, nextV) && canMoveTo(player.u, player.v, desiredU, nextV, 8)) {
+        player.u = desiredU;
+        player.v = nextV;
+        checkWin();
+        setStatus('Vertical movement.', 'info');
+        return;
+      }
+
+      const vCenter = (bounds.min + bounds.max) / 2;
+      const playerSide = player.v >= vCenter ? 1 : -1;
+      const directBlockedByBoundary = isNearBoundary(desiredU, nextV) || !pointInsideDiamond(desiredU, nextV);
+
+      const sortedNudges = [...NUDGE_OFFSETS].sort((a, b) => {
+        const aMatch = Math.sign(a || playerSide) === playerSide ? 0 : 1;
+        const bMatch = Math.sign(b || playerSide) === playerSide ? 0 : 1;
+        return aMatch - bMatch || Math.abs(a) - Math.abs(b);
+      });
+
+      for (const dv of sortedNudges) {
+        const nudgedV = clampV(desiredU, player.v + dv);
+        if (!isBlocked(desiredU, nudgedV) && canMoveTo(player.u, player.v, desiredU, nudgedV, 10)) {
+          player.u = desiredU;
+          player.v = nudgedV;
+          setStatus(directBlockedByBoundary ? 'Border-guided vertical slide.' : 'Slid around convex corner.', 'info');
+          checkWin();
+          return;
+        }
+      }
+
+      // Preserve as much vertical progress as possible before impact.
+      let lo = 0;
+      let hi = 1;
+      let bestU = player.u;
+      let bestV = player.v;
+      for (let i = 0; i < 10; i++) {
+        const mid = (lo + hi) / 2;
+        const testU = clampU(player.u + delta * mid);
+        const testV = clampV(testU, player.v);
+        if (!isBlocked(testU, testV) && canMoveTo(player.u, player.v, testU, testV, 8)) {
+          bestU = testU;
+          bestV = testV;
+          lo = mid;
+        } else {
+          hi = mid;
+        }
+      }
+      if (Math.abs(bestU - player.u) > 0.0008) {
+        player.u = bestU;
+        player.v = bestV;
+        setStatus('Vertical slide.', 'info');
+        checkWin();
+        return;
+      }
+
+      // Final blended attempt for border and wall parity.
+      for (const dv of sortedNudges) {
+        const testU = clampU(player.u + delta * 0.45);
+        const testV = clampV(testU, player.v + dv);
+        if (!isBlocked(testU, testV) && canMoveTo(player.u, player.v, testU, testV, 10)) {
+          player.u = testU;
+          player.v = testV;
+          setStatus(directBlockedByBoundary ? 'Border corner slide.' : 'Corner slide.', 'info');
+          checkWin();
+          return;
+        }
+      }
+
+      triggerBlocked('Merp — Wall collision.');
+    }
+
+    function startScan() {
+      resetScannerState();
+      scanActive = true;
+      peeking = false;
+
+      mazeSection.classList.add('collapsed');
+      mazeSection.classList.remove('peek');
+      scanSection.classList.add('active');
+      peekHint.classList.add('active');
+
+      drawMaze(bfsPath, true);
+      drawScanView(performance.now());
+      setStatus('Scan mode active. Use arrows to move continuous u,v coordinates. Hold P to peek at the 2D diamond.', 'info');
+    }
+
+    function stopScan(message = 'Back in Architect mode. Edit the maze or validate again.', type = 'neutral') {
+      scanActive = false;
+      peeking = false;
+      celebrateUntil = 0;
+      if (winResetHandle) {
+        clearTimeout(winResetHandle);
+        winResetHandle = null;
+      }
+      mazeSection.classList.remove('collapsed', 'peek');
+      scanSection.classList.remove('active');
+      peekHint.classList.remove('active');
+      drawMaze(bfsPath);
+      setStatus(message, type);
+    }
+
+    btnWipe.addEventListener('click', () => {
+      if (scanActive) stopScan();
+      setup();
+    });
+
+    btnValidate.addEventListener('click', () => {
+      bfsPath = bfs();
+      if (bfsPath) {
+        solvable = true;
+        btnScan.disabled = false;
+        drawMaze(bfsPath);
+        setStatus('✓ BFS found a valid path from Start to End. Start Scan is enabled.', 'success');
+      } else {
+        solvable = false;
+        btnScan.disabled = true;
+        drawMaze();
+        setStatus('✗ No valid path exists from Start to End.', 'error');
+      }
+    });
+
+    btnScan.addEventListener('click', () => {
+      if (!solvable) return;
+      startScan();
+    });
+
+    btnBack.addEventListener('click', () => stopScan());
+
+    gridSlider.addEventListener('input', () => {
+      if (scanActive) stopScan();
+      setup();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      keysDown[e.code] = true;
+      if ((e.code === 'KeyP') && scanActive && !peeking) {
+        peeking = true;
+        mazeSection.classList.add('peek');
+        mazeSection.classList.remove('collapsed');
+        drawMaze(bfsPath, true);
+      }
+      if (scanActive && ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
+        e.preventDefault();
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      keysDown[e.code] = false;
+      if ((e.code === 'KeyP') && scanActive && peeking) {
+        peeking = false;
+        mazeSection.classList.remove('peek');
+        mazeSection.classList.add('collapsed');
+      }
+    });
+
+    // Nudge player away from walls that are "appearing" at their position
+    // This creates the effect of walls physically pushing the player
+    function nudgeAwayFromWalls() {
+      const probeRadius = 0.12;
+      const probePoints = [
+        { du: 0, dv: probeRadius },
+        { du: 0, dv: -probeRadius },
+        { du: probeRadius, dv: 0 },
+        { du: -probeRadius, dv: 0 },
+      ];
+
+      let pushU = 0;
+      let pushV = 0;
+      let pushCount = 0;
+
+      for (const probe of probePoints) {
+        const testU = player.u + probe.du;
+        const testV = player.v + probe.dv;
+        if (isBlocked(testU, testV)) {
+          pushU -= probe.du * 0.5;
+          pushV -= probe.dv * 0.5;
+          pushCount++;
+        }
+      }
+
+      // Treat the outer border with the same urgency as a nearby wall so sliding parity feels identical.
+      const boundaryGap = getBoundaryGap(player.u, player.v);
+      if (boundaryGap < probeRadius * 0.9) {
+        const bounds = getVBounds(player.u);
+        const distLeft = player.v - bounds.min;
+        const distRight = bounds.max - player.v;
+        if (distLeft < distRight) pushV += (probeRadius - distLeft) * 0.85;
+        else pushV -= (probeRadius - distRight) * 0.85;
+        pushCount++;
+      }
+
+      if (pushCount > 0) {
+        const newU = clampU(player.u + pushU * 0.08);
+        const newV = clampV(newU, player.v + pushV * 0.08);
+        if (!isBlocked(newU, newV) && canMoveTo(player.u, player.v, newU, newV, 8)) {
+          player.u = newU;
+          player.v = newV;
+        }
+      }
+
+      if (isBlocked(player.u, player.v)) {
+        let escaped = false;
+        for (let radius = 0.1; radius <= 0.8; radius += 0.1) {
+          for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 8) {
+            const testU = clampU(player.u + Math.cos(angle) * radius);
+            const testV = clampV(testU, player.v + Math.sin(angle) * radius);
+            if (!isBlocked(testU, testV)) {
+              player.u = testU;
+              player.v = testV;
+              escaped = true;
+              break;
+            }
+          }
+          if (escaped) break;
+        }
+        if (!escaped) {
+          triggerBlocked('Merp — Squeezed by concave corner!');
+        }
+      }
+    }
+
+    function handleInputs(dt) {
+      if (!scanActive || performance.now() < celebrateUntil) return;
+      
+      let moveV = 0;
+      let moveU = 0;
+      if (keysDown['ArrowLeft']) moveV -= 1;
+      if (keysDown['ArrowRight']) moveV += 1;
+      if (keysDown['ArrowUp']) moveU += 1;
+      if (keysDown['ArrowDown']) moveU -= 1;
+
+      // Handle simultaneous movement
+      if (moveV !== 0 && moveU !== 0) {
+        // Diagonal movement: try combined first, then individual
+        const deltaV = moveV * dt * MOVE_SPEED_V;
+        const deltaU = moveU * dt * MOVE_SPEED_U;
+        const targetU = clampU(player.u + deltaU);
+        const targetV = clampV(targetU, player.v + deltaV);
+        
+        if (!isBlocked(targetU, targetV) && canMoveTo(player.u, player.v, targetU, targetV, 8)) {
+          player.u = targetU;
+          player.v = targetV;
+          checkWin();
+          setStatus('Diagonal movement.', 'info');
+        } else {
+          // Fall back to individual axis movement
+          attemptMoveLateral(deltaV);
+          attemptMoveVertical(deltaU);
+        }
+      } else {
+        if (moveV !== 0) attemptMoveLateral(moveV * dt * MOVE_SPEED_V);
+        if (moveU !== 0) attemptMoveVertical(moveU * dt * MOVE_SPEED_U);
+      }
+
+      // Always nudge away from nearby walls (creates the "wall appearing" push effect)
+      nudgeAwayFromWalls();
+    }
+
+    window.addEventListener('resize', () => {
+      computeSizes();
+      if (scanActive) drawMaze(bfsPath, true);
+      else drawMaze(bfsPath);
+      drawScanView(performance.now());
+    });
+
+    function renderLoop(ts) {
+      const dt = Math.min(0.05, (ts - lastFrameTime) / 1000);
+      lastFrameTime = ts;
+      avatarSquish = Math.max(0, avatarSquish - dt * 4.8);
+
+      if (scanActive) {
+        handleInputs(dt);
+        drawScanView(ts);
+        if (peeking) drawMaze(bfsPath, true);
+      }
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    setup();
+    requestAnimationFrame(renderLoop);
+  </script>
 </body>
 </html>
