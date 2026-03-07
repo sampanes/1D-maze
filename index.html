@@ -91,6 +91,34 @@
     .btn-validate { background: linear-gradient(135deg, #ffc24c, #ff8b2b); color: #171717; }
     .btn-scan { background: linear-gradient(135deg, #5dffb0, #00d9f5); color: #061018; }
     .btn-back { background: linear-gradient(135deg, #8a76ff, #635bff); color: white; }
+    .btn-link { background: linear-gradient(135deg, #7afcff, #5b8cff); color: #08111f; }
+    .btn-link.hidden {
+      display: none;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      transform: translateX(-50%) translateY(18px);
+      background: rgba(10, 15, 29, 0.94);
+      color: #ecf4ff;
+      border: 1px solid rgba(122, 252, 255, 0.28);
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: 0.84rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.28);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 50;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
 
     .status-bar {
       text-align: center;
@@ -279,6 +307,7 @@
     </div>
     <button id="btnWipe" class="btn-wipe">Wipe</button>
     <button id="btnValidate" class="btn-validate">Validate Path</button>
+    <button id="btnGetLink" class="btn-link hidden" disabled>Get Link</button>
     <button id="btnScan" class="btn-scan" disabled>Start Scan</button>
   </div>
 
@@ -331,6 +360,8 @@
     </div>
   </div>
 
+  <div id="toast" class="toast">Link Copied!</div>
+
   <script>
     let gridSize = 16;
     let grid = [];
@@ -359,6 +390,7 @@
 
     let audioCtx = null;
     let lastFrameTime = performance.now();
+    let toastTimer = null;
 
     const mazeCanvas = document.getElementById('mazeCanvas');
     const mazeCtx = mazeCanvas.getContext('2d');
@@ -378,8 +410,10 @@
     const gridVal = document.getElementById('gridVal');
     const btnWipe = document.getElementById('btnWipe');
     const btnValidate = document.getElementById('btnValidate');
+    const btnGetLink = document.getElementById('btnGetLink');
     const btnScan = document.getElementById('btnScan');
     const btnBack = document.getElementById('btnBack');
+    const toast = document.getElementById('toast');
 
     const rowReadout = document.getElementById('rowReadout');
     const colReadout = document.getElementById('colReadout');
@@ -390,11 +424,101 @@
       statusBar.className = 'status-bar ' + type;
     }
 
+    function updateShareButton() {
+      const ready = !!solvable;
+      btnGetLink.disabled = !ready;
+      btnGetLink.classList.toggle('hidden', !ready);
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 1800);
+    }
+
+    function serializeMazeToHex() {
+      const sizeHex = gridSize.toString(16).toUpperCase().padStart(2, '0');
+      let bits = '';
+      for (let r = 0; r < gridSize; r++) {
+        for (let c = 0; c < gridSize; c++) {
+          bits += grid[r][c] ? '1' : '0';
+        }
+      }
+      while (bits.length % 4 !== 0) bits += '0';
+
+      let hex = '';
+      for (let i = 0; i < bits.length; i += 4) {
+        hex += parseInt(bits.slice(i, i + 4), 2).toString(16).toUpperCase();
+      }
+      hex = hex.replace(/0+$/, '');
+      return sizeHex + hex;
+    }
+
+    function applySerializedMap(mapString) {
+      if (!mapString || mapString.length < 2) return false;
+      const sizeHex = mapString.slice(0, 2);
+      const parsedSize = parseInt(sizeHex, 16);
+      if (!Number.isFinite(parsedSize) || parsedSize < 2 || parsedSize > 64) return false;
+
+      gridSize = parsedSize;
+      gridSlider.value = String(parsedSize);
+      gridVal.textContent = String(parsedSize);
+      grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(0));
+
+      const payload = (mapString.slice(2).toUpperCase().match(/[0-9A-F]/g) || []).join('');
+      const totalCells = gridSize * gridSize;
+      let cellIndex = 0;
+
+      for (let i = 0; i < payload.length && cellIndex < totalCells; i++) {
+        const nibble = parseInt(payload[i], 16);
+        for (let bit = 3; bit >= 0 && cellIndex < totalCells; bit--) {
+          const value = (nibble >> bit) & 1;
+          const row = Math.floor(cellIndex / gridSize);
+          const col = cellIndex % gridSize;
+          if (!isStart(row, col) && !isEnd(row, col)) {
+            grid[row][col] = value;
+          }
+          cellIndex++;
+        }
+      }
+
+      bfsPath = bfs();
+      solvable = !!bfsPath;
+      btnScan.disabled = !solvable;
+      updateShareButton();
+      resetScannerState();
+      computeSizes();
+      drawMaze(bfsPath);
+      drawScanView(performance.now());
+
+      if (solvable) {
+        setStatus('Loaded maze from URL and validated successfully. Start Scan is enabled.', 'success');
+      } else {
+        setStatus('Loaded maze from URL, but no valid Start→End path exists.', 'error');
+      }
+      return true;
+    }
+
+    function tryLoadMapFromUrl() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const mapString = params.get('map');
+        if (!mapString) return false;
+        return applySerializedMap(mapString.trim());
+      } catch (_) {
+        return false;
+      }
+    }
+
     function initGrid() {
       grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(0));
       bfsPath = null;
       solvable = false;
       btnScan.disabled = true;
+      updateShareButton();
     }
 
     function resetScannerState() {
@@ -689,6 +813,7 @@
       bfsPath = null;
       solvable = false;
       btnScan.disabled = true;
+      updateShareButton();
       drawMaze();
       if (scanActive) drawScanView(performance.now());
     }
@@ -1309,14 +1434,37 @@
       if (bfsPath) {
         solvable = true;
         btnScan.disabled = false;
+        updateShareButton();
         drawMaze(bfsPath);
         setStatus('✓ BFS found a valid path from Start to End. Start Scan is enabled.', 'success');
       } else {
         solvable = false;
         btnScan.disabled = true;
+        updateShareButton();
         drawMaze();
         setStatus('✗ No valid path exists from Start to End.', 'error');
       }
+    });
+
+    btnGetLink.addEventListener('click', async () => {
+      if (!solvable) return;
+      const encoded = serializeMazeToHex();
+      const url = new URL(window.location.href);
+      url.searchParams.set('map', encoded);
+      const fullUrl = url.toString();
+
+      try {
+        await navigator.clipboard.writeText(fullUrl);
+        showToast('Link Copied!');
+        setStatus('Shareable maze URL copied to clipboard.', 'success');
+      } catch (_) {
+        showToast('Link Ready in Address Bar');
+        setStatus('Clipboard copy failed, but the URL was generated in the address bar.', 'info');
+      }
+
+      try {
+        window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+      } catch (_) {}
     });
 
     btnScan.addEventListener('click', () => {
@@ -1477,7 +1625,9 @@
       requestAnimationFrame(renderLoop);
     }
 
-    setup();
+    if (!tryLoadMapFromUrl()) {
+      setup();
+    }
     requestAnimationFrame(renderLoop);
   </script>
 </body>
