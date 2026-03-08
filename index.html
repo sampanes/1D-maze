@@ -291,6 +291,38 @@
       .controls { gap: 10px; }
       .control-group { padding: 8px 10px; }
     }
+	
+	@media (max-width: 768px) {
+	  button {
+		min-height: 44px; /* Standard touch target size */
+		padding: 12px 20px;
+	  }
+	  .scan-readout {
+		width: 100%; /* Stack readout on mobile to save horizontal space */
+		justify-content: space-around;
+	  }
+	}
+	
+	/* Indicate touchability on mobile */
+	@media (max-width: 768px) {
+	  #scanCanvas {
+		border: 2px solid rgba(0, 217, 245, 0.4);
+		box-shadow: 0 0 15px rgba(0, 217, 245, 0.2);
+	  }
+	  
+	  .scan-help kbd {
+		display: none; /* Hide keyboard keys on mobile help */
+	  }
+
+	  .diamond-label {
+		font-size: 0.6rem; /* Shrink labels for small screens */
+	  }
+	}
+
+	/* Cursor style for desktop tap-to-move */
+	#scanCanvas {
+	  cursor: crosshair;
+	}
   </style>
 </head>
 <body>
@@ -335,29 +367,42 @@
 
   <div id="peekHint" class="peek-hint">Hold <kbd>P</kbd> to peek at the 2D diamond while scanning.</div>
 
-  <div id="scanSection" class="scan-section">
-    <h2>1D Shadow Scanner</h2>
-    <p><strong>Up/Down</strong> changes <strong>u</strong> and moves the horizontal cyan scan-line up/down the diamond. <strong>Left/Right</strong> changes <strong>v</strong> and moves your avatar laterally along that exact slice.</p>
+	<div id="scanSection" class="scan-section">
+	  <h2>1D Shadow Scanner</h2>
+	  <p class="hidden md:block"><strong>Up/Down</strong> changes <strong>u</strong> (scan-line). <strong>Left/Right</strong> changes <strong>v</strong> (avatar position).</p>
+	  <p class="md:hidden"><strong>Drag or Tap</strong> the scanner below to move. Start with finger on actual dot. Slide <strong>vertical</strong> for u, <strong>horizontal</strong> for v. Release often. Start back on the actual dot.</p>
 
-    <div class="scan-shell">
-      <div class="scan-canvas-wrap">
-        <canvas id="scanCanvas" width="900" height="320"></canvas>
-      </div>
+	  <div class="scan-shell">
+		<div class="scan-canvas-wrap">
+		  <canvas id="scanCanvas" width="900" height="320" class="touch-none cursor-crosshair"></canvas>
+		</div>
 
-      <div class="scan-controls">
-        <button id="btnBack" class="btn-back">← Back to Architect</button>
-        <div class="scan-readout">
-          <span id="rowReadout">u: 0.00</span>
-          <span id="colReadout">v: 1.00</span>
-          <span id="cellReadout">Cell: START</span>
-        </div>
-      </div>
+	  <div class="scan-controls mt-4">
+		<button id="btnBack" class="btn-back">← Back</button>
+		
+		<button id="btnToggleDetails" class="md:hidden bg-slate-800 text-cyan-400 border border-cyan-900/50 rounded-full px-4 py-2 font-bold">
+		  Details ▾
+		</button>
 
-      <div class="scan-help">
-        <div>Controls: <kbd>←</kbd> <kbd>→</kbd> move along the current scan-line, <kbd>↑</kbd> <kbd>↓</kbd> move the scan-line through the diamond, <kbd>P</kbd> peeks the 2D diamond.</div>
-        <div>The 1D viewport samples the angled slice directly from the 2D grid, so walls grow and shrink smoothly as the line cuts through them.</div>
-      </div>
-    </div>
+		<div class="scan-readout">
+		  <span id="rowReadout">u: 0.00</span>
+		  <span id="colReadout">v: 1.00</span>
+		  <span id="cellReadout">Cell: START</span>
+		</div>
+	  </div>
+
+	  <div id="mobileCollapseGroup" class="hidden md:block">
+		<div class="scan-help border-t border-white/5 mt-4 pt-4">
+		  <div class="desktop-only hidden md:block">
+			Controls: <kbd>←</kbd> <kbd>→</kbd> move, <kbd>↑</kbd> <kbd>↓</kbd> scan, <kbd>P</kbd> peeks diamond.
+		  </div>
+		  <div class="mobile-only md:hidden text-cyan-200/70 italic">
+			Stylus optimized: Use the 1D viewport to navigate the diamond grid.
+		  </div>
+		  <div class="mt-2">The 1D viewport samples the angled slice directly from the 2D grid.</div>
+		</div>
+	  </div>
+	</div>
   </div>
 
   <div id="toast" class="toast">Link Copied!</div>
@@ -418,6 +463,43 @@
     const rowReadout = document.getElementById('rowReadout');
     const colReadout = document.getElementById('colReadout');
     const cellReadout = document.getElementById('cellReadout');
+	const btnToggleDetails = document.getElementById('btnToggleDetails');
+	const mobileCollapseGroup = document.getElementById('mobileCollapseGroup');
+
+	// 1. Toggle Collapse for Mobile
+	btnToggleDetails.addEventListener('click', () => {
+	  const isHidden = mobileCollapseGroup.classList.contains('hidden');
+	  if (isHidden) {
+		mobileCollapseGroup.classList.remove('hidden');
+		btnToggleDetails.textContent = 'Details ▴';
+	  } else {
+		mobileCollapseGroup.classList.add('hidden');
+		btnToggleDetails.textContent = 'Details ▾';
+	  }
+	});
+
+	// 2. Mobile-Specific UI Cleanup
+	function applyMobileOptimizations() {
+	  const isMobile = window.innerWidth < 768;
+	  const peekHint = document.getElementById('peekHint');
+	  const headerP = document.querySelector('.header p');
+	  
+	  if (isMobile) {
+		peekHint.style.display = 'none'; 
+		mobileCollapseGroup.classList.add('hidden');
+		// Simplified mobile sub-header
+		headerP.textContent = "Tap & Slide the 1D Scanner to move.";
+	  } else {
+		if (scanActive) peekHint.style.display = 'block';
+		mobileCollapseGroup.classList.remove('hidden');
+		headerP.textContent = "Paint a diamond maze, validate it, then navigate with the 1D scanner.";
+	  }
+	}
+
+	// Hook into your existing setup and resize logic
+	window.addEventListener('resize', applyMobileOptimizations);
+	// Call once on init
+	applyMobileOptimizations();
 
     function setStatus(message, type = 'neutral') {
       statusBar.textContent = message;
@@ -1394,20 +1476,26 @@
       triggerBlocked('Merp — Wall collision.');
     }
 
-    function startScan() {
-      resetScannerState();
-      scanActive = true;
-      peeking = false;
+	function startScan() {
+	  resetScannerState();
+	  scanActive = true;
+	  peeking = false;
 
-      mazeSection.classList.add('collapsed');
-      mazeSection.classList.remove('peek');
-      scanSection.classList.add('active');
-      peekHint.classList.add('active');
+	  mazeSection.classList.add('collapsed');
+	  mazeSection.classList.remove('peek');
+	  scanSection.classList.add('active');
+	  peekHint.classList.add('active');
 
-      drawMaze(bfsPath, true);
-      drawScanView(performance.now());
-      setStatus('Scan mode active. Use arrows to move continuous u,v coordinates. Hold P to peek at the 2D diamond.', 'info');
-    }
+	  drawMaze(bfsPath, true);
+	  drawScanView(performance.now());
+
+	  // Conditional message based on screen width
+	  if (window.innerWidth < 768) {
+		setStatus('Scan mode active. Tap or slide the 1D scanner with your stylus to navigate.', 'info');
+	  } else {
+		setStatus('Scan mode active. Use arrows to move continuous u,v coordinates. Hold P to peek at the 2D diamond.', 'info');
+	  }
+	}
 
     function stopScan(message = 'Back in Architect mode. Edit the maze or validate again.', type = 'neutral') {
       scanActive = false;
@@ -1603,6 +1691,47 @@
       // Always nudge away from nearby walls (creates the "wall appearing" push effect)
       nudgeAwayFromWalls();
     }
+	
+	// Tap-to-Move Logic for Stylus/Touch
+	function handleScanTouch(e) {
+	  if (!scanActive || performance.now() < celebrateUntil) return;
+	  e.preventDefault();
+
+	  const rect = scanCanvas.getBoundingClientRect();
+	  const touch = e.touches ? e.touches[0] : e;
+	  const offsetX = touch.clientX - rect.left;
+	  const offsetY = touch.clientY - rect.top;
+
+	  const w = rect.width;
+	  const h = rect.height;
+	  const padX = 34 * (w / 900); // Scale padding to current width
+
+	  // Calculate V (Lateral) - based on X position
+	  const usableW = w - padX * 2;
+	  const totalV = 2 * gridSize;
+	  const targetV = ((offsetX - padX) / usableW) * totalV;
+
+	  // Calculate U (Vertical) - based on Y position (Vertical slide)
+	  // Maps Y range to U range (-gridSize to gridSize)
+	  const targetU = ((offsetY / h) - 0.5) * -2 * gridSize;
+
+	  // Apply movement
+	  const deltaV = targetV - player.v;
+	  const deltaU = targetU - player.u;
+
+	  // We use a fraction of the distance to allow for smooth "dragging"
+	  if (Math.abs(deltaV) > 0.01) attemptMoveLateral(deltaV * 0.5);
+	  if (Math.abs(deltaU) > 0.01) attemptMoveVertical(deltaU * 0.5);
+	}
+
+	// Attach listeners to scanCanvas
+	scanCanvas.addEventListener('mousedown', (e) => { painting = true; handleScanTouch(e); });
+	window.addEventListener('mousemove', (e) => { if (painting && scanActive) handleScanTouch(e); });
+	window.addEventListener('mouseup', () => painting = false);
+
+	scanCanvas.addEventListener('touchstart', (e) => { painting = true; handleScanTouch(e); }, { passive: false });
+	scanCanvas.addEventListener('touchmove', (e) => { if (painting && scanActive) handleScanTouch(e); }, { passive: false });
+	scanCanvas.addEventListener('touchend', () => painting = false);
 
     window.addEventListener('resize', () => {
       computeSizes();
