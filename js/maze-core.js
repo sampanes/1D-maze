@@ -119,7 +119,12 @@ function tryLoadMapFromUrl() {
         const params = new URLSearchParams(window.location.search);
         const mapString = params.get('map');
         if (!mapString) return false;
-        return applySerializedMap(mapString.trim());
+        const loaded = applySerializedMap(mapString.trim());
+        if (loaded && solvable) {
+            startScan();
+            setStatus('Loaded shared maze and entered scan mode. Hold P to peek at the map.', 'info');
+        }
+        return loaded;
     } catch (_) {
         return false;
     }
