@@ -51,3 +51,4 @@ Check it out here before I decide to refactor the whole thing and break it:
 ## Bunch of links dumped here
 
 * [Squiggly 12](https://sampanes.github.io/1D-maze/index.html?map=0C4F840A5EA50A57A5025FE4207AF6286AA0A2) - One I drew to be as turny as I could get with 12x12
+* [Slightly bigger](https://sampanes.github.io/1D-maze/index.html?map=1020402240AF1C21F67D042145B0643FF6702423AC0E241834106417C414461102) - Pretty mean tbh but not impossible.
