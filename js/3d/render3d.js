@@ -151,3 +151,76 @@ function renderDebugPreview3d() {
 
     sliceOffset = prevSlice;
 }
+
+function updateScanReadout3d(cs) {
+    rowReadout.textContent = `S: ${sliceOffset.toFixed(2)}`;
+    colReadout.textContent = `x: ${player3d.x.toFixed(2)}`;
+    yReadout3d.textContent = `y: ${player3d.y.toFixed(2)}`;
+
+    if (cs.startRect && pointInRect3d(player3d.x, player3d.y, cs.startRect)) {
+        cellReadout.textContent = 'Cell: START';
+        return;
+    }
+    if (cs.endRect && pointInRect3d(player3d.x, player3d.y, cs.endRect)) {
+        cellReadout.textContent = 'Cell: END';
+        return;
+    }
+    for (const r of cs.passable) {
+        if (pointInRect3d(player3d.x, player3d.y, r)) {
+            cellReadout.textContent = 'Cell: PATH';
+            return;
+        }
+    }
+    cellReadout.textContent = 'Cell: VOID';
+}
+
+function drawCrossSectionRects3d(cs, m) {
+    const ctx = scanCtx3d;
+    ctx.fillStyle = '#0d1018';
+    ctx.fillRect(0, 0, scanCanvas3d.width, scanCanvas3d.height);
+
+    ctx.fillStyle = '#f2f5ff';
+    for (const r of cs.passable) {
+        const c = rectToCanvas(r, m);
+        ctx.fillRect(c.cx0, c.cy0, c.cw, c.ch);
+        ctx.strokeStyle = 'rgba(97,118,191,0.4)';
+        ctx.strokeRect(c.cx0, c.cy0, c.cw, c.ch);
+    }
+
+    if (cs.startRect) {
+        const c = rectToCanvas(cs.startRect, m);
+        ctx.fillStyle = '#5dffb0';
+        ctx.fillRect(c.cx0, c.cy0, c.cw, c.ch);
+        ctx.strokeStyle = 'rgba(97,118,191,0.5)';
+        ctx.strokeRect(c.cx0, c.cy0, c.cw, c.ch);
+    }
+    if (cs.endRect) {
+        const c = rectToCanvas(cs.endRect, m);
+        ctx.fillStyle = '#ff6a6a';
+        ctx.fillRect(c.cx0, c.cy0, c.cw, c.ch);
+        ctx.strokeStyle = 'rgba(97,118,191,0.5)';
+        ctx.strokeRect(c.cx0, c.cy0, c.cw, c.ch);
+    }
+}
+
+function drawPlayer3d(m) {
+    const ctx = scanCtx3d;
+    const px = wxToCanvas(player3d.x, m);
+    const py = wyToCanvas(player3d.y, m);
+    ctx.fillStyle = '#7dff2e';
+    ctx.shadowColor = '#7dff2e';
+    ctx.shadowBlur = 14;
+    ctx.beginPath();
+    ctx.arc(px, py, Math.max(4, m.scale * PLAYER3D_RADIUS * 0.9), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+}
+
+function renderScan3d() {
+    const cs = buildCrossSection(sliceOffset);
+    const m = getCanvasMapping3d();
+    drawCrossSectionRects3d(cs, m);
+    drawPlayer3d(m);
+    if (debugMode3d) drawDebugOverlay3d(cs, m);
+    updateScanReadout3d(cs);
+}
