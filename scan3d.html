@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diamond Maze Architect 3D</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/game.css">
+</head>
+<body>
+  <div class="header">
+    <h1>◆ Diamond Maze Architect 3D ◆</h1>
+    <p>Build a 3D lattice, validate it, then explore with a moving cross-section slice.</p>
+    <div style="margin-top:8px;">
+      <a href="index.html" style="
+        display: inline-block;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #7afcff;
+        border: 1px solid rgba(122,252,255,0.28);
+        border-radius: 999px;
+        padding: 4px 12px;
+        text-decoration: none;
+        letter-spacing: 0.03em;
+        transition: opacity 0.15s;
+      ">← 2D Game</a>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="control-group">
+      <label for="gridSlider">Grid Size</label>
+      <input id="gridSlider" type="range" min="2" max="16" value="5" step="1" />
+      <span class="val" id="gridVal">5</span>
+    </div>
+
+    <div class="control-group">
+      <label>Layer</label>
+      <button id="layerPrevBtn" style="
+        padding: 4px 10px;
+        background: rgba(255,255,255,0.07);
+        color: #9db1d8;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.1);
+        font-weight: 700;
+        cursor: pointer;
+      ">◀</button>
+      <span id="layerDisplay" class="val">0</span>
+      <button id="layerNextBtn" style="
+        padding: 4px 10px;
+        background: rgba(255,255,255,0.07);
+        color: #9db1d8;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.1);
+        font-weight: 700;
+        cursor: pointer;
+      ">▶</button>
+    </div>
+
+    <button id="btnWipe" class="btn-wipe">Wipe</button>
+    <button id="btnValidate" class="btn-validate">Validate Path</button>
+    <button id="btnGetLink" class="btn-link hidden" disabled>Get Link</button>
+    <button id="btnScan" class="btn-scan" disabled>Start Scan</button>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-swatch" style="background:#5dffb0"></div>Start</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#ff6a6a"></div>End</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#f2f5ff"></div>Path</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#0d1018"></div>Wall</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#ffd84f"></div>BFS Solution</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#7dff2e"></div>Avatar</div>
+  </div>
+
+  <div id="statusBar" class="status-bar neutral">Click and drag on the diamond to paint walls. Right-click or hold Shift to erase.</div>
+
+  <div id="mazeSection" class="maze-section">
+    <div class="canvas-wrapper">
+      <div id="diamondContainer" class="diamond-container">
+        <canvas id="mazeCanvas"></canvas>
+        <div id="startLabel" class="diamond-label start-label">◀ START</div>
+        <div id="endLabel" class="diamond-label end-label">END ▶</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="peekHint" class="peek-hint">Hold <kbd>P</kbd> to peek at the 3D grid while scanning.</div>
+
+  <div id="scanSection" class="scan-section">
+    <h2>3D Cross-Section Scanner</h2>
+    <p class="hidden md:block">
+      <strong>W / S</strong> move the slice up/down.
+      <strong>Arrow Keys</strong> navigate the cross-section.
+      <strong>P</strong> peeks the 3D grid. <strong>D</strong> toggles debug.
+    </p>
+    <p class="md:hidden"><strong>Drag</strong> the scanner to navigate. Two-finger drag for slice.</p>
+
+    <div class="scan-shell">
+      <div class="scan-canvas-wrap">
+        <canvas id="scanCanvas" width="640" height="640" class="touch-none cursor-crosshair" style="max-width:min(100%,640px);"></canvas>
+      </div>
+
+      <div class="scan-controls mt-4">
+        <button id="btnBack" class="btn-back">← Back</button>
+
+        <button id="btnToggleDetails" class="md:hidden bg-slate-800 text-cyan-400 border border-cyan-900/50 rounded-full px-4 py-2 font-bold">
+          Details ▾
+        </button>
+
+        <div class="scan-readout">
+          <span id="rowReadout">S: 0.00</span>
+          <span id="colReadout">x: 0.00</span>
+          <span id="yReadout3d">y: 0.00</span>
+          <span id="cellReadout">Cell: —</span>
+        </div>
+      </div>
+
+      <div id="mobileCollapseGroup" class="hidden md:block">
+        <div class="scan-help border-t border-white/5 mt-4 pt-4">
+          <div class="desktop-only hidden md:block">
+            Controls: <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> move &middot;
+            <kbd>W</kbd> <kbd>S</kbd> slice &middot; <kbd>P</kbd> peek &middot; <kbd>D</kbd> debug
+          </div>
+          <div class="mobile-only md:hidden text-cyan-200/70 italic">
+            Stylus optimized: drag the 2D viewport to navigate the cross-section.
+          </div>
+          <div class="mt-2">
+            The 2D viewport shows the horizontal cross-section of the 3D lattice at the current slice height.
+            At center height the cross-section is a perfect N×N grid; moving the slice narrows it toward a point.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">Link Copied!</div>
+
+  <!-- Shared dependencies (same load order as index.html) -->
+  <script src="js/globals.js"></script>
+  <script src="js/maze-core.js"></script>
+  <script src="js/audio.js"></script>
+
+  <!-- 3D-specific scripts (load in dependency order) -->
+  <script src="js/3d/state3d.js"></script>
+  <script src="js/3d/lattice.js"></script>
+  <script src="js/3d/geometry.js"></script>
+  <script src="js/3d/slice.js"></script>
+  <script src="js/3d/render3d.js"></script>
+  <script src="js/3d/player3d.js"></script>
+  <script src="js/3d/ui3d.js"></script>
+  <script src="js/3d/init3d.js"></script>
+</body>
+</html>
