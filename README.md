@@ -50,4 +50,4 @@ Check it out here before I decide to refactor the whole thing and break it:
 
 ## Bunch of links dumped here
 
-* [Squiggly 12](http://127.0.0.1:5500/index.html?map=0C4F840A5EA50A57A5025FE4207AF6286AA0A2) - One I drew to be as turny as I could get with 12x12
+* [Squiggly 12](https://sampanes.github.io/1D-maze/index.html?map=0C4F840A5EA50A57A5025FE4207AF6286AA0A2) - One I drew to be as turny as I could get with 12x12
