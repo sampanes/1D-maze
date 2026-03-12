@@ -13,7 +13,7 @@ let worldToCanvas3d = null;
 function rotateWorldPoint45(wx, wy) {
     return {
         rx: (wx + wy) / SQ2,
-        ry: (wy - wx) / SQ2,
+        ry: (wx - wy) / SQ2,
     };
 }
 
