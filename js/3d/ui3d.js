@@ -154,3 +154,65 @@ document.addEventListener('keydown', (e) => {
         scanSection3d.style.display = '';
     }
 });
+
+function startScan3d() {
+    if (!solvable3d) return;
+    scanActive3d = true;
+    peeking3d = false;
+    sliceOffset = getCenterSliceOffset();
+    const startRect = getCellSliceRect(0, 0, gridSize3d - 1, sliceOffset);
+    player3d.x = (startRect.x0 + startRect.x1) * 0.5;
+    player3d.y = (startRect.y0 + startRect.y1) * 0.5;
+
+    mazeSection.classList.add('collapsed');
+    scanSection3d.style.display = 'block';
+    peekHint.style.display = 'block';
+    btnScan.textContent = 'Scanning…';
+    setStatus('Scan started. Use arrow keys to move, W/S to scan up/down.', 'info');
+    renderScan3d();
+}
+
+function stopScan3d(message = 'Scan stopped.') {
+    scanActive3d = false;
+    peeking3d = false;
+    mazeSection.classList.remove('peek');
+    mazeSection.classList.remove('collapsed');
+    peekHint.style.display = 'none';
+    btnScan.textContent = 'Start Scan';
+    for (const k of Object.keys(keysDown3d)) keysDown3d[k] = false;
+    setStatus(message, 'neutral');
+    redraw3d();
+}
+
+btnScan.addEventListener('click', () => {
+    if (!scanActive3d) startScan3d();
+});
+
+btnBack.addEventListener('click', () => {
+    if (scanActive3d) stopScan3d('Returned to build mode.');
+});
+
+document.addEventListener('keydown', (e) => {
+    keysDown3d[e.code] = true;
+    if (!scanActive3d) return;
+
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'w', 'W', 's', 'S'].includes(e.key)) {
+        e.preventDefault();
+    }
+    if (e.code === 'KeyP' && !peeking3d) {
+        peeking3d = true;
+        mazeSection.classList.add('peek');
+        mazeSection.classList.remove('collapsed');
+        drawMaze3d(getBfsPathSetForDiagonal(currentLayer));
+    }
+});
+
+document.addEventListener('keyup', (e) => {
+    keysDown3d[e.code] = false;
+    if (!scanActive3d) return;
+    if (e.code === 'KeyP' && peeking3d) {
+        peeking3d = false;
+        mazeSection.classList.remove('peek');
+        mazeSection.classList.add('collapsed');
+    }
+});

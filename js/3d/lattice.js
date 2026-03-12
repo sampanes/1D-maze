@@ -35,6 +35,7 @@ function redraw3d() {
     computeSizes();
     const pathSet = getBfsPathSetForDiagonal(currentLayer);
     drawMaze3d(pathSet);
+    // Layer display follows diagonal index convention: Layer = d + 1.
     // Display as "Layer X" where X increases going visually upward.
     // Higher currentLayer = lower wz (visually lower), so flip: X = (2N-1) - currentLayer.
     // Center diagonal (currentLayer=N-1) still shows "Layer N".
@@ -303,7 +304,7 @@ function drawMaze3d(pathSet) {
     for (let ck = 0; ck < N; ck++) {
         for (let cj = 0; cj < N; cj++) {
             for (let ci = 0; ci < N; ci++) {
-                const d      = ci + ck;          // ← new diagonal
+                const d      = ci + ck;          // ← active diagonal
                 const dist   = Math.abs(d - dL);
                 const isWall = grid3d[ck][cj][ci] === 1;
                 const pc = project(...worldPos(ci + 0.5, cj + 0.5, ck + 0.5));
