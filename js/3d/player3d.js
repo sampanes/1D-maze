@@ -4,6 +4,7 @@ const PLAYER3D_SPEED = 3.9;
 const PLAYER3D_RADIUS = 0.14;
 const PLAYER3D_NUDGES = [0, 0.05, -0.05, 0.1, -0.1, 0.16, -0.16, 0.22, -0.22, 0.3, -0.3];
 let player3dLastBlockedAt = 0;
+const PLAYER3D_NUDGES = [0, 0.05, -0.05, 0.1, -0.1, 0.16, -0.16, 0.22, -0.22];
 
 function pointInRect3d(x, y, r) {
     return x >= r.x0 + 0.0005 && x <= r.x1 - 0.0005 && y >= r.y0 + 0.0005 && y <= r.y1 - 0.0005;
@@ -132,6 +133,20 @@ function resolvePlayerIntoCrossSection3d(cs) {
 
     noteBlocked3d();
     return false;
+function moveWithNudge3d(dx, dy, cs) {
+    if (tryMove3d(dx, dy, cs)) return;
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+        for (const n of PLAYER3D_NUDGES) {
+            if (tryMove3d(dx, n, cs)) return;
+        }
+        tryMove3d(0, dy, cs);
+    } else {
+        for (const n of PLAYER3D_NUDGES) {
+            if (tryMove3d(n, dy, cs)) return;
+        }
+        tryMove3d(dx, 0, cs);
+    }
 }
 
 function updatePlayer3d(dt, cs) {
