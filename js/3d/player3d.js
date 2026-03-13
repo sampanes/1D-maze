@@ -107,19 +107,6 @@ function moveWithNudge3d(dx, dy, cs) {
 }
 
 /**
- * Gather all currently visible walkable slice rectangles.
- * @param {{passable:Array,startRect:Object|null,endRect:Object|null,pathRects:Array}} cs
- * @returns {Array<{x0:number,x1:number,y0:number,y1:number}>}
- */
-function getAllWalkableRects3d(cs) {
-    const rects = [];
-    if (cs.startRect) rects.push(cs.startRect);
-    if (cs.endRect) rects.push(cs.endRect);
-    for (const r of cs.passable) rects.push(r);
-    return rects;
-}
-
-/**
  * Attempt to relocate the player into valid space after slice changes shrink/grow the map.
  * The search is biased toward +x,+y so receding layers naturally nudge down-right on screen.
  * @param {{passable:Array,startRect:Object|null,endRect:Object|null,pathRects:Array}} cs
@@ -160,16 +147,6 @@ function stabilizePlayerInSlice3d(cs) {
             player3d.y = c.y;
             return true;
         }
-    }
-
-    const fallbackRects = getAllWalkableRects3d(cs);
-    if (fallbackRects.length) {
-        fallbackRects.sort((a, b) => (a.y0 + a.y1 + a.x0 + a.x1) - (b.y0 + b.y1 + b.x0 + b.x1));
-        const pref = fallbackRects[fallbackRects.length - 1];
-        const c = clampToWorld3d((pref.x0 + pref.x1) * 0.5, (pref.y0 + pref.y1) * 0.5);
-        player3d.x = c.x;
-        player3d.y = c.y;
-        return canOccupy3d(player3d.x, player3d.y, cs);
     }
 
     return false;

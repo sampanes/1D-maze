@@ -378,6 +378,47 @@ function drawMaze3d(pathSet) {
 
     mazeCtx.globalAlpha = 1.0;
 
+
+    if (scanActive3d && peeking3d) {
+        const C = sliceOffset * SQ2;
+        const planeWz = (N - C) / SQ2;
+        const planeCorners = [
+            project(0, 0, planeWz),
+            project(N * SQ2, 0, planeWz),
+            project(N * SQ2, N * SQ2, planeWz),
+            project(0, N * SQ2, planeWz),
+        ];
+
+        if (planeCorners.every(Boolean)) {
+            mazeCtx.save();
+            mazeCtx.globalAlpha = 1;
+            mazeCtx.beginPath();
+            mazeCtx.moveTo(planeCorners[0][0], planeCorners[0][1]);
+            for (let i = 1; i < planeCorners.length; i++) mazeCtx.lineTo(planeCorners[i][0], planeCorners[i][1]);
+            mazeCtx.closePath();
+            mazeCtx.fillStyle = 'rgba(0, 217, 245, 0.10)';
+            mazeCtx.fill();
+            mazeCtx.strokeStyle = 'rgba(0, 217, 245, 0.55)';
+            mazeCtx.lineWidth = 1.5;
+            mazeCtx.stroke();
+
+            const playerProj = project(player3d.x + N / SQ2, player3d.y, planeWz);
+            if (playerProj) {
+                mazeCtx.fillStyle = '#7dff2e';
+                mazeCtx.shadowColor = '#7dff2e';
+                mazeCtx.shadowBlur = 12;
+                mazeCtx.beginPath();
+                mazeCtx.arc(playerProj[0], playerProj[1], 5, 0, Math.PI * 2);
+                mazeCtx.fill();
+                mazeCtx.shadowBlur = 0;
+                mazeCtx.fillStyle = 'rgba(236, 255, 248, 0.95)';
+                mazeCtx.font = 'bold 12px sans-serif';
+                mazeCtx.fillText('YOU ARE HERE', playerProj[0] + 10, playerProj[1] - 8);
+            }
+            mazeCtx.restore();
+        }
+    }
+
     // Expose camera/projection state so paintAt (ui3d.js) can do hit-testing
     // without re-running the full camera setup.
     window._proj3d = { project, worldPos, N };
