@@ -160,6 +160,31 @@ btnGetLink.addEventListener('click', async () => {
 
 const scanSection3d = document.getElementById('scanSection');
 
+
+function pickEditorLayerForSlice() {
+    const N = gridSize3d;
+    const middle = N - 1;
+    const maxLayer = 2 * N - 2;
+    const diagonal = sliceOffset * SQ2 - 1;
+
+    const lo = Math.max(0, Math.floor(diagonal));
+    const hi = Math.min(maxLayer, Math.ceil(diagonal));
+
+    if (lo === hi) return lo;
+
+    const dLo = Math.abs(diagonal - lo);
+    const dHi = Math.abs(hi - diagonal);
+    if (Math.abs(dLo - dHi) <= 1e-9) {
+        return Math.abs(lo - middle) <= Math.abs(hi - middle) ? lo : hi;
+    }
+    return dLo < dHi ? lo : hi;
+}
+
+function syncEditorLayerToPeekSlice() {
+    currentLayer = pickEditorLayerForSlice();
+    layerDisplay.textContent = String(2 * gridSize3d - 1 - currentLayer);
+}
+
 document.addEventListener('keydown', (e) => {
     if (e.key !== 'd' && e.key !== 'D') return;
     debugMode3d = !debugMode3d;
@@ -185,23 +210,11 @@ function startScan3d(opts = {}) {
 
     scanSection3d.style.display = 'block';
     peekHint.style.display = 'block';
-
-    if (showMapFirst) {
-        // Show map initially for shared links, but do not force active peek state.
-        // This keeps W/S slice controls available immediately on load.
-        peeking3d = false;
-        mazeSection.classList.add('peek');
-        mazeSection.classList.remove('collapsed');
-        drawMaze3d(getBfsPathSetForDiagonal(currentLayer));
-        setStatus('Shared 3D maze loaded. Scan is active; hold P to toggle the map view.', 'info');
-    } else {
-        peeking3d = false;
-        mazeSection.classList.remove('peek');
-        mazeSection.classList.add('collapsed');
-        setStatus('Scan started. Use arrow keys to move, W/S to scan up/down.', 'info');
-    }
+    mazeSection.classList.add('collapsed');
+    mazeSection.classList.remove('peek');
 
     btnScan.textContent = 'Scanning…';
+    setStatus('Scan started. Use arrow keys to move, W/S to scan up/down.', 'info');
 }
 
 function stopScan3d(message = 'Scan stopped.') {
@@ -232,6 +245,7 @@ document.addEventListener('keydown', (e) => {
     }
     if (e.code === 'KeyP' && !peeking3d) {
         peeking3d = true;
+        syncEditorLayerToPeekSlice();
         mazeSection.classList.add('peek');
         mazeSection.classList.remove('collapsed');
         drawMaze3d(getBfsPathSetForDiagonal(currentLayer));

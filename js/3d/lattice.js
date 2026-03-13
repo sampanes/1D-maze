@@ -505,12 +505,6 @@ function applySerializedMap3d(mapString) {
     btnGetLink.classList.toggle('hidden', !solvable3d);
     redraw3d();
 
-    if (solvable3d) {
-        setStatus('Loaded shared 3D maze and validated successfully.', 'success');
-    } else {
-        setStatus('Loaded 3D maze from URL, but Start→End is unsolved.', 'error');
-    }
-
     return true;
 }
 
