@@ -189,8 +189,8 @@ function updatePlayer3d(dt, cs) {
     let dy = 0;
     if (keysDown3d['ArrowLeft'])  { dx -= 1; dy -= 1; }
     if (keysDown3d['ArrowRight']) { dx += 1; dy += 1; }
-    if (keysDown3d['ArrowUp'])    { dx += 1; dy -= 1; }
-    if (keysDown3d['ArrowDown'])  { dx -= 1; dy += 1; }
+    if (keysDown3d['ArrowUp'])    { dx -= 1; dy += 1; }
+    if (keysDown3d['ArrowDown'])  { dx += 1; dy -= 1; }
     if (!dx && !dy) return;
 
     const m = Math.hypot(dx, dy);
