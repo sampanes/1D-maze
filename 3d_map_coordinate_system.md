@@ -112,3 +112,28 @@ Example:
 - “Avatar got blocked between **Cell 2** and **Cell 5** at `(i=1,j=0,k=1)` while slicing to `k≈0.7`.”
 
 This makes bug reports unambiguous for both design and implementation.
+
+---
+
+## 6) Explicit 3×3 example from latest geometry discussion
+
+For `N=3`, the center diagonal slice (`i+k=2`) contains exactly these 9 prisms:
+
+```text
+Front row (j=0):  (0,0,2)  (1,0,1)  (2,0,0)
+Middle row (j=1): (0,1,2)  (1,1,1)  (2,1,0)
+Back row (j=2):   (0,2,2)  (1,2,1)  (2,2,0)
+```
+
+The next upward slice band (`i+k` moving toward `3`) tends toward 6 prisms:
+
+```text
+Front row (j=0):  (1,0,2)  (2,0,1)
+Middle row (j=1): (1,1,2) (2,1,1)
+Back row (j=2):   (1,2,2)  (2,2,1)
+```
+
+Interpretation:
+- W moves the slice upward through this transition.
+- S moves downward through the inverse transition.
+- During this motion, the section shrinks in the `i↔k` axis while remaining `N` cells long in `j`.

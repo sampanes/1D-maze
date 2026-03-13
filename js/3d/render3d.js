@@ -28,10 +28,10 @@ function getCanvasMapping3d() {
     const pad = 24;
 
     const corners = [
-        rotateWorldPoint45(0, -N / SQ2),
-        rotateWorldPoint45(0, N / SQ2),
-        rotateWorldPoint45(N * SQ2, -N / SQ2),
-        rotateWorldPoint45(N * SQ2, N / SQ2),
+        rotateWorldPoint45(-N / SQ2, 0),
+        rotateWorldPoint45(-N / SQ2, N * SQ2),
+        rotateWorldPoint45(N / SQ2, 0),
+        rotateWorldPoint45(N / SQ2, N * SQ2),
     ];
 
     const minRX = Math.min(...corners.map((p) => p.rx));

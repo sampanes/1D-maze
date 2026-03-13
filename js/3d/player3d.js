@@ -57,11 +57,12 @@ function canOccupy3d(x, y, cs) {
  * @returns {{x:number,y:number}}
  */
 function clampToWorld3d(x, y) {
-    const maxX = gridSize3d * SQ2;
-    const minY = -gridSize3d / SQ2;
-    const maxY = gridSize3d / SQ2;
+    const minX = -gridSize3d / SQ2;
+    const maxX = gridSize3d / SQ2;
+    const minY = 0;
+    const maxY = gridSize3d * SQ2;
     return {
-        x: Math.max(0 + PLAYER3D_RADIUS, Math.min(maxX - PLAYER3D_RADIUS, x)),
+        x: Math.max(minX + PLAYER3D_RADIUS, Math.min(maxX - PLAYER3D_RADIUS, x)),
         y: Math.max(minY + PLAYER3D_RADIUS, Math.min(maxY - PLAYER3D_RADIUS, y)),
     };
 }
