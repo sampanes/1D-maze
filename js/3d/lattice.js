@@ -519,7 +519,12 @@ function tryLoad3dMapFromUrl() {
         const params = new URLSearchParams(window.location.search);
         const mapString = params.get('map3d') || params.get('map');
         if (!mapString) return false;
-        return applySerializedMap3d(mapString.trim());
+        const loaded = applySerializedMap3d(mapString.trim());
+        if (loaded && solvable3d && !scanActive3d) {
+            startScan3d();
+            setStatus('Shared 3D maze loaded, validated, and scan started. Hold P to peek at the map.', 'info');
+        }
+        return loaded;
     } catch (_) {
         return false;
     }
