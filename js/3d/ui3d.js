@@ -128,8 +128,26 @@ btnValidate.addEventListener('click', () => {
 
 // ── Get Link button ───────────────────────────────────────────────────────────
 
-btnGetLink.addEventListener('click', () => {
-    showToast('Sharing not yet implemented.');
+btnGetLink.addEventListener('click', async () => {
+    if (!solvable3d) return;
+
+    const encoded = serializeMaze3dToHex();
+    const url = new URL(window.location.href);
+    url.searchParams.set('map3d', encoded);
+    const fullUrl = url.toString();
+
+    try {
+        await navigator.clipboard.writeText(fullUrl);
+        showToast('Link Copied!');
+        setStatus('Shareable 3D maze URL copied to clipboard.', 'success');
+    } catch (_) {
+        showToast('Link Ready in Address Bar');
+        setStatus('Clipboard copy failed, but the 3D URL was generated in the address bar.', 'info');
+    }
+
+    try {
+        window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+    } catch (_) { }
 });
 
 // ── Back button (wired in Phase 6) ───────────────────────────────────────────
@@ -155,7 +173,8 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-function startScan3d() {
+function startScan3d(opts = {}) {
+    const { showMapFirst = false } = opts;
     if (!solvable3d) return;
     scanActive3d = true;
     peeking3d = false;
@@ -164,11 +183,23 @@ function startScan3d() {
     player3d.x = (startRect.x0 + startRect.x1) * 0.5;
     player3d.y = (startRect.y0 + startRect.y1) * 0.5;
 
-    mazeSection.classList.add('collapsed');
     scanSection3d.style.display = 'block';
     peekHint.style.display = 'block';
+
+    if (showMapFirst) {
+        peeking3d = true;
+        mazeSection.classList.add('peek');
+        mazeSection.classList.remove('collapsed');
+        drawMaze3d(getBfsPathSetForDiagonal(currentLayer));
+        setStatus('Shared 3D maze loaded. Scan is active; hold P to toggle the map view.', 'info');
+    } else {
+        peeking3d = false;
+        mazeSection.classList.remove('peek');
+        mazeSection.classList.add('collapsed');
+        setStatus('Scan started. Use arrow keys to move, W/S to scan up/down.', 'info');
+    }
+
     btnScan.textContent = 'Scanning…';
-    setStatus('Scan started. Use arrow keys to move, W/S to scan up/down.', 'info');
 }
 
 function stopScan3d(message = 'Scan stopped.') {

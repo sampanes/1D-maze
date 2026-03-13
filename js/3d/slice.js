@@ -23,6 +23,8 @@ function moveSlice3d(deltaS) {
  * @param {number} dt - Frame delta in seconds.
  */
 function updateSliceFromInput3d(dt) {
+    if (peeking3d) return;
+
     let dir = 0;
     if (keysDown3d['KeyW']) dir -= 1;
     if (keysDown3d['KeyS']) dir += 1;
