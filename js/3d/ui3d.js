@@ -187,7 +187,9 @@ function startScan3d(opts = {}) {
     peekHint.style.display = 'block';
 
     if (showMapFirst) {
-        peeking3d = true;
+        // Show map initially for shared links, but do not force active peek state.
+        // This keeps W/S slice controls available immediately on load.
+        peeking3d = false;
         mazeSection.classList.add('peek');
         mazeSection.classList.remove('collapsed');
         drawMaze3d(getBfsPathSetForDiagonal(currentLayer));
