@@ -519,20 +519,7 @@ function tryLoad3dMapFromUrl() {
         const params = new URLSearchParams(window.location.search);
         const mapString = params.get('map3d') || params.get('map');
         if (!mapString) return false;
-
-        const loaded = applySerializedMap3d(mapString.trim());
-        if (!loaded) return false;
-
-        // Revalidate once more before auto-starting scan from shared links.
-        validatePath3d();
-
-        if (solvable3d) {
-            setTimeout(() => {
-                if (!scanActive3d) startScan3d({ showMapFirst: true });
-            }, 120);
-        }
-
-        return true;
+        return applySerializedMap3d(mapString.trim());
     } catch (_) {
         return false;
     }
