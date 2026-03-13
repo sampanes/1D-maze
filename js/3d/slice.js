@@ -24,8 +24,8 @@ function moveSlice3d(deltaS) {
  */
 function updateSliceFromInput3d(dt) {
     let dir = 0;
-    if (keysDown3d['KeyW']) dir += 1;
-    if (keysDown3d['KeyS']) dir -= 1;
+    if (keysDown3d['KeyW']) dir -= 1;
+    if (keysDown3d['KeyS']) dir += 1;
     if (!dir) return;
     moveSlice3d(dir * SLICE_SPEED * dt);
 }
