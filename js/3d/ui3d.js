@@ -128,8 +128,26 @@ btnValidate.addEventListener('click', () => {
 
 // ── Get Link button ───────────────────────────────────────────────────────────
 
-btnGetLink.addEventListener('click', () => {
-    showToast('Sharing not yet implemented.');
+btnGetLink.addEventListener('click', async () => {
+    if (!solvable3d) return;
+
+    const encoded = serializeMaze3dToHex();
+    const url = new URL(window.location.href);
+    url.searchParams.set('map3d', encoded);
+    const fullUrl = url.toString();
+
+    try {
+        await navigator.clipboard.writeText(fullUrl);
+        showToast('Link Copied!');
+        setStatus('Shareable 3D maze URL copied to clipboard.', 'success');
+    } catch (_) {
+        showToast('Link Ready in Address Bar');
+        setStatus('Clipboard copy failed, but the 3D URL was generated in the address bar.', 'info');
+    }
+
+    try {
+        window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+    } catch (_) { }
 });
 
 // ── Back button (wired in Phase 6) ───────────────────────────────────────────

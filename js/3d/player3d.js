@@ -108,7 +108,7 @@ function moveWithNudge3d(dx, dy, cs) {
 
 /**
  * Attempt to relocate the player into valid space after slice changes shrink/grow the map.
- * The search is biased toward +x,+y so receding layers naturally nudge down-right on screen.
+ * Uses a bounded nearest-first search to avoid long-distance repositioning pops.
  * @param {{passable:Array,startRect:Object|null,endRect:Object|null,pathRects:Array}} cs
  * @returns {boolean}
  */
@@ -117,9 +117,8 @@ function stabilizePlayerInSlice3d(cs) {
 
     const origin = { x: player3d.x, y: player3d.y };
     const step = 0.045;
-    const maxRing = Math.max(16, Math.ceil((gridSize3d * 1.8) / step));
-    const biasX = 1;
-    const biasY = 1;
+    const maxDrift = 1.2;
+    const maxRing = Math.max(12, Math.ceil(maxDrift / step));
 
     for (let ring = 1; ring <= maxRing; ring++) {
         const candidates = [];
@@ -131,12 +130,8 @@ function stabilizePlayerInSlice3d(cs) {
         }
 
         candidates.sort((a, b) => {
-            const dax = a[0] * step;
-            const day = a[1] * step;
-            const dbx = b[0] * step;
-            const dby = b[1] * step;
-            const da = Math.hypot(dax, day) - 0.32 * (dax * biasX + day * biasY);
-            const db = Math.hypot(dbx, dby) - 0.32 * (dbx * biasX + dby * biasY);
+            const da = Math.hypot(a[0], a[1]);
+            const db = Math.hypot(b[0], b[1]);
             return da - db;
         });
 

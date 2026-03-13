@@ -444,9 +444,83 @@ function validatePath3d() {
 // ── Serialisation (Step 12) ───────────────────────────────────────────────────
 
 function serializeMaze3dToHex() {
-    return '';  // TODO: Step 12
+    const sizeHex = gridSize3d.toString(16).toUpperCase().padStart(2, '0');
+    let bits = '';
+
+    for (let k = 0; k < gridSize3d; k++) {
+        for (let j = 0; j < gridSize3d; j++) {
+            for (let i = 0; i < gridSize3d; i++) {
+                const isForcedEndpoint = (i === 0 && j === 0 && k === gridSize3d - 1) ||
+                    (i === gridSize3d - 1 && j === gridSize3d - 1 && k === 0);
+                bits += (!isForcedEndpoint && grid3d[k][j][i]) ? '1' : '0';
+            }
+        }
+    }
+
+    while (bits.length % 4 !== 0) bits += '0';
+
+    let hex = '';
+    for (let i = 0; i < bits.length; i += 4) {
+        hex += parseInt(bits.slice(i, i + 4), 2).toString(16).toUpperCase();
+    }
+    return sizeHex + hex.replace(/0+$/, '');
+}
+
+function applySerializedMap3d(mapString) {
+    if (!mapString || mapString.length < 2) return false;
+
+    const sizeHex = mapString.slice(0, 2);
+    const parsedSize = parseInt(sizeHex, 16);
+    if (!Number.isFinite(parsedSize) || parsedSize < GRID3D_MIN || parsedSize > GRID3D_MAX) return false;
+
+    initGrid3d(parsedSize);
+    gridSlider.value = String(parsedSize);
+    gridVal.textContent = String(parsedSize);
+
+    const payload = (mapString.slice(2).toUpperCase().match(/[0-9A-F]/g) || []).join('');
+    const totalCells = parsedSize * parsedSize * parsedSize;
+    let cellIndex = 0;
+
+    for (let idx = 0; idx < payload.length && cellIndex < totalCells; idx++) {
+        const nibble = parseInt(payload[idx], 16);
+        for (let bit = 3; bit >= 0 && cellIndex < totalCells; bit--) {
+            const value = (nibble >> bit) & 1;
+            const plane = parsedSize * parsedSize;
+            const k = Math.floor(cellIndex / plane);
+            const rem = cellIndex % plane;
+            const j = Math.floor(rem / parsedSize);
+            const i = rem % parsedSize;
+
+            const isStartCell = i === 0 && j === 0 && k === parsedSize - 1;
+            const isEndCell = i === parsedSize - 1 && j === parsedSize - 1 && k === 0;
+            if (!isStartCell && !isEndCell) grid3d[k][j][i] = value;
+            cellIndex++;
+        }
+    }
+
+    const path = bfs3d();
+    solvable3d = !!path;
+    btnScan.disabled = !solvable3d;
+    btnGetLink.disabled = !solvable3d;
+    btnGetLink.classList.toggle('hidden', !solvable3d);
+    redraw3d();
+
+    if (solvable3d) {
+        setStatus('Loaded shared 3D maze and validated successfully.', 'success');
+    } else {
+        setStatus('Loaded 3D maze from URL, but Start→End is unsolved.', 'error');
+    }
+
+    return true;
 }
 
 function tryLoad3dMapFromUrl() {
-    return false;  // TODO: Step 12
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const mapString = params.get('map3d') || params.get('map');
+        if (!mapString) return false;
+        return applySerializedMap3d(mapString.trim());
+    } catch (_) {
+        return false;
+    }
 }
