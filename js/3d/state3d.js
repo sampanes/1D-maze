@@ -8,6 +8,10 @@ const SLICE_SPEED = 3.5;        // world-Z units per second
 const GRID3D_MIN = 2;
 const GRID3D_MAX = 16;
 const GRID3D_DEFAULT = 5;
+const CAMERA3D_AZ_DEFAULT = 35 * Math.PI / 180;
+const CAMERA3D_EL_DEFAULT = 35 * Math.PI / 180;
+const CAMERA3D_EL_MIN = 8 * Math.PI / 180;
+const CAMERA3D_EL_MAX = 80 * Math.PI / 180;
 
 // ── Mutable state ────────────────────────────────────────────────────────────
 let gridSize3d = GRID3D_DEFAULT;
@@ -34,6 +38,8 @@ let solvable3d = false;
 let scanActive3d = false;
 let peeking3d = false;
 let debugMode3d = false;
+let cameraAz3d = CAMERA3D_AZ_DEFAULT;
+let cameraEl3d = CAMERA3D_EL_DEFAULT;
 
 // Input
 const keysDown3d = {};
@@ -59,5 +65,6 @@ const layerPrevBtn   = document.getElementById('layerPrevBtn');
 const layerNextBtn   = document.getElementById('layerNextBtn');
 const layerDisplay   = document.getElementById('layerDisplay');
 const yReadout3d     = document.getElementById('yReadout3d');
+const btnResetView3d = document.getElementById('btnResetView3d');
 const scanCanvas3d   = document.getElementById('scanCanvas');   // reuses shared ID
 const scanCtx3d      = scanCanvas3d.getContext('2d');

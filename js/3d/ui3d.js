@@ -159,6 +159,112 @@ btnGetLink.addEventListener('click', async () => {
 // is drawn on top of the normal scan render each frame (Step 9 / Phase 5).
 
 const scanSection3d = document.getElementById('scanSection');
+let rotateDragActive3d = false;
+let rotateDragByMiddle3d = false;
+let rotateKeyHeld3d = false;
+let rotateLastX3d = 0;
+let rotateLastY3d = 0;
+
+function isDefaultView3d() {
+    return Math.abs(cameraAz3d - CAMERA3D_AZ_DEFAULT) < 1e-6
+        && Math.abs(cameraEl3d - CAMERA3D_EL_DEFAULT) < 1e-6;
+}
+
+function updateResetViewButton3d() {
+    if (!btnResetView3d) return;
+    btnResetView3d.classList.toggle('hidden', isDefaultView3d());
+}
+
+function applyCameraRotation3d(dx, dy) {
+    const azSpeed = 0.0085;
+    const elSpeed = 0.0068;
+    cameraAz3d -= dx * azSpeed;
+    cameraEl3d += dy * elSpeed;
+
+    const fullTurn = Math.PI * 2;
+    while (cameraAz3d > Math.PI) cameraAz3d -= fullTurn;
+    while (cameraAz3d < -Math.PI) cameraAz3d += fullTurn;
+    cameraEl3d = Math.max(CAMERA3D_EL_MIN, Math.min(CAMERA3D_EL_MAX, cameraEl3d));
+}
+
+function beginRotateDrag3d(e, viaMiddleButton) {
+    if (scanActive3d) return;
+    rotateDragActive3d = true;
+    rotateDragByMiddle3d = !!viaMiddleButton;
+    rotateLastX3d = e.clientX;
+    rotateLastY3d = e.clientY;
+    painting = false;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    setStatus('Rotate view: drag to orbit. Release to continue painting.', 'info');
+}
+
+function endRotateDrag3d() {
+    if (!rotateDragActive3d) return;
+    rotateDragActive3d = false;
+    rotateDragByMiddle3d = false;
+    setStatus('Click and drag on the diamond to paint walls. Right-click or hold Shift to erase. Rotate with MMB drag or hold R + drag.', 'neutral');
+}
+
+mazeCanvas.addEventListener('mousedown', (e) => {
+    const middleDrag = e.button === 1;
+    const rDrag = rotateKeyHeld3d && e.button === 0;
+    if (!middleDrag && !rDrag) return;
+    beginRotateDrag3d(e, middleDrag);
+}, true);
+
+mazeCanvas.addEventListener('mousemove', (e) => {
+    if (!rotateDragActive3d || scanActive3d) return;
+    const dx = e.clientX - rotateLastX3d;
+    const dy = e.clientY - rotateLastY3d;
+    rotateLastX3d = e.clientX;
+    rotateLastY3d = e.clientY;
+    applyCameraRotation3d(dx, dy);
+    updateResetViewButton3d();
+    redraw3d();
+    e.preventDefault();
+    e.stopImmediatePropagation();
+}, true);
+
+window.addEventListener('mouseup', (e) => {
+    if (!rotateDragActive3d) return;
+    if (rotateDragByMiddle3d && e.button !== 1) return;
+    endRotateDrag3d();
+});
+
+mazeCanvas.addEventListener('mouseleave', () => {
+    if (!rotateDragActive3d) return;
+    if (!rotateDragByMiddle3d && rotateKeyHeld3d) return;
+    endRotateDrag3d();
+});
+
+mazeCanvas.addEventListener('contextmenu', (e) => {
+    if (!rotateDragByMiddle3d) return;
+    e.preventDefault();
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyR') rotateKeyHeld3d = true;
+});
+
+document.addEventListener('keyup', (e) => {
+    if (e.code === 'KeyR') {
+        rotateKeyHeld3d = false;
+        if (rotateDragActive3d && !rotateDragByMiddle3d) endRotateDrag3d();
+    }
+});
+
+if (btnResetView3d) {
+    btnResetView3d.addEventListener('click', () => {
+        cameraAz3d = CAMERA3D_AZ_DEFAULT;
+        cameraEl3d = CAMERA3D_EL_DEFAULT;
+        updateResetViewButton3d();
+        redraw3d();
+        setStatus('View reset to the default camera angle.', 'info');
+    });
+}
+
+updateResetViewButton3d();
 
 
 function pickEditorLayerForSlice() {

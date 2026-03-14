@@ -2,7 +2,10 @@
 
 const PLAYER3D_SPEED = 3.9;
 const PLAYER3D_RADIUS = 0.14;
-const PLAYER3D_NUDGES = [0, 0.05, -0.05, 0.1, -0.1, 0.16, -0.16, 0.22, -0.22];
+const PLAYER3D_NUDGES = [0, 0.04, -0.04, 0.08, -0.08, 0.12, -0.12];
+const PLAYER3D_SWEEP_STEP = PLAYER3D_RADIUS * 0.35;
+const PLAYER3D_BLOCKED_BEEP_COOLDOWN_MS = 130;
+let lastBlockedBeepAt3d = 0;
 
 /**
  * Test whether a point is safely inside a slice rectangle with a tiny inset tolerance.
@@ -85,24 +88,115 @@ function tryMove3d(dx, dy, cs) {
 }
 
 /**
+ * Play the blocked sound/status with a short cooldown to avoid audio spam while
+ * a key is held down against a wall.
+ */
+function triggerBlocked3d() {
+    const now = performance.now();
+    if (now - lastBlockedBeepAt3d >= PLAYER3D_BLOCKED_BEEP_COOLDOWN_MS) {
+        playMerp();
+        lastBlockedBeepAt3d = now;
+    }
+    setStatus('Merp — Wall collision.', 'error');
+}
+
+/**
+ * Sweep movement from the current player position toward (dx,dy) in small
+ * increments so we never tunnel through thin walls or corners.
+ * @param {number} dx
+ * @param {number} dy
+ * @param {{passable:Array,startRect:Object|null,endRect:Object|null,pathRects:Array}} cs
+ * @returns {{moved:boolean,blocked:boolean,reached:boolean,usedDx:number,usedDy:number}}
+ */
+function sweepMove3d(dx, dy, cs) {
+    const startX = player3d.x;
+    const startY = player3d.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 1e-9) {
+        return { moved: false, blocked: false, reached: true, usedDx: 0, usedDy: 0 };
+    }
+
+    const steps = Math.max(1, Math.ceil(dist / PLAYER3D_SWEEP_STEP));
+    let blocked = false;
+
+    for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const candidate = clampToWorld3d(startX + dx * t, startY + dy * t);
+        if (!canOccupy3d(candidate.x, candidate.y, cs)) {
+            blocked = true;
+            break;
+        }
+        player3d.x = candidate.x;
+        player3d.y = candidate.y;
+    }
+
+    const usedDx = player3d.x - startX;
+    const usedDy = player3d.y - startY;
+    const moved = Math.hypot(usedDx, usedDy) > 1e-8;
+    const reached = !blocked && Math.abs(usedDx - dx) < 0.0006 && Math.abs(usedDy - dy) < 0.0006;
+    return { moved, blocked, reached, usedDx, usedDy };
+}
+
+/**
+ * Try sliding along a single axis using the remaining delta from a blocked move.
+ * @param {number} primaryDelta
+ * @param {number} secondaryDelta
+ * @param {boolean} primaryIsX
+ * @param {{passable:Array,startRect:Object|null,endRect:Object|null,pathRects:Array}} cs
+ * @returns {boolean}
+ */
+function tryAxisSlide3d(primaryDelta, secondaryDelta, primaryIsX, cs) {
+    const direct = primaryIsX
+        ? sweepMove3d(primaryDelta, 0, cs)
+        : sweepMove3d(0, primaryDelta, cs);
+    if (direct.moved) {
+        if (secondaryDelta !== 0) {
+            if (primaryIsX) sweepMove3d(0, secondaryDelta, cs);
+            else sweepMove3d(secondaryDelta, 0, cs);
+        }
+        return true;
+    }
+
+    for (const n of PLAYER3D_NUDGES) {
+        const attempt = primaryIsX
+            ? sweepMove3d(primaryDelta, n, cs)
+            : sweepMove3d(n, primaryDelta, cs);
+        if (!attempt.moved) continue;
+        if (secondaryDelta !== 0) {
+            if (primaryIsX) sweepMove3d(0, secondaryDelta, cs);
+            else sweepMove3d(secondaryDelta, 0, cs);
+        }
+        return true;
+    }
+
+    return false;
+}
+
+/**
  * Move with orthogonal nudges so the avatar slides around nearby corners naturally.
  * @param {number} dx
  * @param {number} dy
  * @param {{passable:Array,startRect:Object|null,endRect:Object|null,pathRects:Array}} cs
  */
 function moveWithNudge3d(dx, dy, cs) {
-    if (tryMove3d(dx, dy, cs)) return;
+    const first = sweepMove3d(dx, dy, cs);
+    if (first.reached) return;
 
-    if (Math.abs(dx) > Math.abs(dy)) {
-        for (const n of PLAYER3D_NUDGES) {
-            if (tryMove3d(dx, n, cs)) return;
-        }
-        tryMove3d(0, dy, cs);
+    const remainingDx = dx - first.usedDx;
+    const remainingDy = dy - first.usedDy;
+    const xMajor = Math.abs(remainingDx) >= Math.abs(remainingDy);
+
+    let slid = false;
+    if (xMajor) {
+        slid = tryAxisSlide3d(remainingDx, remainingDy, true, cs)
+            || tryAxisSlide3d(remainingDy, remainingDx, false, cs);
     } else {
-        for (const n of PLAYER3D_NUDGES) {
-            if (tryMove3d(n, dy, cs)) return;
-        }
-        tryMove3d(dx, 0, cs);
+        slid = tryAxisSlide3d(remainingDy, remainingDx, false, cs)
+            || tryAxisSlide3d(remainingDx, remainingDy, true, cs);
+    }
+
+    if (!first.moved && !slid && first.blocked) {
+        triggerBlocked3d();
     }
 }
 

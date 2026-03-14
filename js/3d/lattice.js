@@ -209,8 +209,8 @@ function drawMaze3d(pathSet) {
     //          spread and revealing more of the top faces.
     //   D   — distance from lattice centre in world units.
     //          N * 2.5 keeps the whole lattice in frame for N ≤ 8.
-    const AZ = 35 * Math.PI / 180;
-    const EL = 35 * Math.PI / 180;   // ← raise/lower camera here (was 20°)
+    const AZ = cameraAz3d;
+    const EL = cameraEl3d;
     const D  = N * 2.5;
 
     // Lattice centre in post-rotation world space.
