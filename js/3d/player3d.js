@@ -2,8 +2,7 @@
 
 const PLAYER3D_SPEED = 3.9;
 const PLAYER3D_RADIUS = 0.14;
-const PLAYER3D_NUDGES = [0, 0.04, -0.04, 0.08, -0.08, 0.12, -0.12];
-const PLAYER3D_SWEEP_STEP = PLAYER3D_RADIUS * 0.35;
+const PLAYER3D_SWEEP_STEP = PLAYER3D_RADIUS * 0.32;
 const PLAYER3D_BLOCKED_BEEP_COOLDOWN_MS = 130;
 let lastBlockedBeepAt3d = 0;
 
@@ -35,17 +34,21 @@ function pointPassable3d(x, y, cs) {
 }
 
 /**
- * Check whether the player circle can occupy a position using center+cardinal samples.
+ * Check whether the player circle can occupy a position.
+ * Uses center + cardinal + diagonal samples to prevent clipping through
+ * concave corners (cardinal-only checks can miss diagonal corner intrusions).
  * @param {number} x
  * @param {number} y
  * @param {{passable:Array,startRect:Object|null,endRect:Object|null,pathRects:Array}} cs
  * @returns {boolean}
  */
 function canOccupy3d(x, y, cs) {
+    const d = PLAYER3D_RADIUS * Math.SQRT1_2;
     const samples = [
         [0, 0],
         [PLAYER3D_RADIUS, 0], [-PLAYER3D_RADIUS, 0],
         [0, PLAYER3D_RADIUS], [0, -PLAYER3D_RADIUS],
+        [d, d], [d, -d], [-d, d], [-d, -d],
     ];
     for (const [dx, dy] of samples) {
         if (!pointPassable3d(x + dx, y + dy, cs)) return false;
@@ -71,23 +74,6 @@ function clampToWorld3d(x, y) {
 }
 
 /**
- * Attempt one direct movement step.
- * @param {number} dx
- * @param {number} dy
- * @param {{passable:Array,startRect:Object|null,endRect:Object|null,pathRects:Array}} cs
- * @returns {boolean}
- */
-function tryMove3d(dx, dy, cs) {
-    const c = clampToWorld3d(player3d.x + dx, player3d.y + dy);
-    if (canOccupy3d(c.x, c.y, cs)) {
-        player3d.x = c.x;
-        player3d.y = c.y;
-        return true;
-    }
-    return false;
-}
-
-/**
  * Play the blocked sound/status with a short cooldown to avoid audio spam while
  * a key is held down against a wall.
  */
@@ -103,17 +89,18 @@ function triggerBlocked3d() {
 /**
  * Sweep movement from the current player position toward (dx,dy) in small
  * increments so we never tunnel through thin walls or corners.
+ * Returns whether any motion happened and whether we hit an obstruction.
  * @param {number} dx
  * @param {number} dy
  * @param {{passable:Array,startRect:Object|null,endRect:Object|null,pathRects:Array}} cs
- * @returns {{moved:boolean,blocked:boolean,reached:boolean,usedDx:number,usedDy:number}}
+ * @returns {{moved:boolean,blocked:boolean,usedDx:number,usedDy:number}}
  */
 function sweepMove3d(dx, dy, cs) {
     const startX = player3d.x;
     const startY = player3d.y;
     const dist = Math.hypot(dx, dy);
     if (dist < 1e-9) {
-        return { moved: false, blocked: false, reached: true, usedDx: 0, usedDy: 0 };
+        return { moved: false, blocked: false, usedDx: 0, usedDy: 0 };
     }
 
     const steps = Math.max(1, Math.ceil(dist / PLAYER3D_SWEEP_STEP));
@@ -133,69 +120,46 @@ function sweepMove3d(dx, dy, cs) {
     const usedDx = player3d.x - startX;
     const usedDy = player3d.y - startY;
     const moved = Math.hypot(usedDx, usedDy) > 1e-8;
-    const reached = !blocked && Math.abs(usedDx - dx) < 0.0006 && Math.abs(usedDy - dy) < 0.0006;
-    return { moved, blocked, reached, usedDx, usedDy };
+    return { moved, blocked, usedDx, usedDy };
 }
 
 /**
- * Try sliding along a single axis using the remaining delta from a blocked move.
- * @param {number} primaryDelta
- * @param {number} secondaryDelta
- * @param {boolean} primaryIsX
+ * Resolve one axis movement using swept collision.
+ * @param {number} delta
+ * @param {boolean} axisX
  * @param {{passable:Array,startRect:Object|null,endRect:Object|null,pathRects:Array}} cs
- * @returns {boolean}
+ * @returns {{moved:boolean,blocked:boolean}}
  */
-function tryAxisSlide3d(primaryDelta, secondaryDelta, primaryIsX, cs) {
-    const direct = primaryIsX
-        ? sweepMove3d(primaryDelta, 0, cs)
-        : sweepMove3d(0, primaryDelta, cs);
-    if (direct.moved) {
-        if (secondaryDelta !== 0) {
-            if (primaryIsX) sweepMove3d(0, secondaryDelta, cs);
-            else sweepMove3d(secondaryDelta, 0, cs);
-        }
-        return true;
-    }
-
-    for (const n of PLAYER3D_NUDGES) {
-        const attempt = primaryIsX
-            ? sweepMove3d(primaryDelta, n, cs)
-            : sweepMove3d(n, primaryDelta, cs);
-        if (!attempt.moved) continue;
-        if (secondaryDelta !== 0) {
-            if (primaryIsX) sweepMove3d(0, secondaryDelta, cs);
-            else sweepMove3d(secondaryDelta, 0, cs);
-        }
-        return true;
-    }
-
-    return false;
+function sweepAxis3d(delta, axisX, cs) {
+    if (Math.abs(delta) < 1e-9) return { moved: false, blocked: false };
+    const r = axisX ? sweepMove3d(delta, 0, cs) : sweepMove3d(0, delta, cs);
+    return { moved: r.moved, blocked: r.blocked };
 }
 
 /**
- * Move with orthogonal nudges so the avatar slides around nearby corners naturally.
+ * Move with axis-separated swept collision.
+ *
+ * Math intuition:
+ * - We still request the same target delta (dx,dy) from input.
+ * - We resolve one component, then the other.
+ * - If one axis is blocked and the other is free, the free component survives,
+ *   which yields natural wall-sliding.
+ * - If both are blocked from the current position, emit Merp and stop.
+ *
+ * This mirrors typical tile/cell collision handling and avoids "pop" behaviour
+ * caused by large orthogonal nudges after a diagonal impact.
  * @param {number} dx
  * @param {number} dy
  * @param {{passable:Array,startRect:Object|null,endRect:Object|null,pathRects:Array}} cs
  */
 function moveWithNudge3d(dx, dy, cs) {
-    const first = sweepMove3d(dx, dy, cs);
-    if (first.reached) return;
+    const xFirst = Math.abs(dx) >= Math.abs(dy);
+    const first = xFirst ? sweepAxis3d(dx, true, cs) : sweepAxis3d(dy, false, cs);
+    const second = xFirst ? sweepAxis3d(dy, false, cs) : sweepAxis3d(dx, true, cs);
 
-    const remainingDx = dx - first.usedDx;
-    const remainingDy = dy - first.usedDy;
-    const xMajor = Math.abs(remainingDx) >= Math.abs(remainingDy);
-
-    let slid = false;
-    if (xMajor) {
-        slid = tryAxisSlide3d(remainingDx, remainingDy, true, cs)
-            || tryAxisSlide3d(remainingDy, remainingDx, false, cs);
-    } else {
-        slid = tryAxisSlide3d(remainingDy, remainingDx, false, cs)
-            || tryAxisSlide3d(remainingDx, remainingDy, true, cs);
-    }
-
-    if (!first.moved && !slid && first.blocked) {
+    const moved = first.moved || second.moved;
+    const blockedHard = !moved && (first.blocked || second.blocked);
+    if (blockedHard) {
         triggerBlocked3d();
     }
 }
