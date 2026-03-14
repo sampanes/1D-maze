@@ -204,9 +204,9 @@ function drawMaze3d(pathSet) {
     // Tweak these three constants to reposition the viewpoint:
     //   AZ  — azimuth (0–90°): 0 = dead-on front, 90 = pure side view.
     //          ~35° gives a comfortable 3/4 angle so depth is clear.
-    //   EL  — elevation (0–90°): 0 = eye-level, 90 = directly overhead.
-    //          Higher values tilt the camera downward, compressing vertical
-    //          spread and revealing more of the top faces.
+    //   EL  — elevation (-90°..90°): 0 = eye-level, +90 = overhead, -90 = underneath.
+    //          Higher values tilt the camera downward and reveal top faces;
+    //          lower/negative values orbit below to inspect undersides.
     //   D   — distance from lattice centre in world units.
     //          N * 2.5 keeps the whole lattice in frame for N ≤ 8.
     const AZ = cameraAz3d;

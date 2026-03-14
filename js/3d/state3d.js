@@ -10,7 +10,11 @@ const GRID3D_MAX = 16;
 const GRID3D_DEFAULT = 5;
 const CAMERA3D_AZ_DEFAULT = 35 * Math.PI / 180;
 const CAMERA3D_EL_DEFAULT = 35 * Math.PI / 180;
+<<<<<<< HEAD
 const CAMERA3D_EL_MIN = 8 * Math.PI / 180;
+=======
+const CAMERA3D_EL_MIN = -80 * Math.PI / 180;
+>>>>>>> 6bb41fa (Allow 3D orbit camera to rotate below the maze)
 const CAMERA3D_EL_MAX = 80 * Math.PI / 180;
 
 // ── Mutable state ────────────────────────────────────────────────────────────
