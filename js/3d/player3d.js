@@ -74,6 +74,72 @@ function clampToWorld3d(x, y) {
 }
 
 /**
+<<<<<<< HEAD
+=======
+ * Play the blocked sound/status with a short cooldown to avoid audio spam while
+ * a key is held down against a wall.
+ */
+function triggerBlocked3d() {
+    const now = performance.now();
+    if (now - lastBlockedBeepAt3d >= PLAYER3D_BLOCKED_BEEP_COOLDOWN_MS) {
+        playMerp();
+        lastBlockedBeepAt3d = now;
+    }
+    setStatus('Merp — Wall collision.', 'error');
+}
+
+/**
+ * Sweep movement from the current player position toward (dx,dy) in small
+ * increments so we never tunnel through thin walls or corners.
+ * Returns whether any motion happened and whether we hit an obstruction.
+ * @param {number} dx
+ * @param {number} dy
+ * @param {{passable:Array,startRect:Object|null,endRect:Object|null,pathRects:Array}} cs
+ * @returns {{moved:boolean,blocked:boolean,usedDx:number,usedDy:number}}
+ */
+function sweepMove3d(dx, dy, cs) {
+    const startX = player3d.x;
+    const startY = player3d.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 1e-9) {
+        return { moved: false, blocked: false, usedDx: 0, usedDy: 0 };
+    }
+
+    const steps = Math.max(1, Math.ceil(dist / PLAYER3D_SWEEP_STEP));
+    let blocked = false;
+
+    for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const candidate = clampToWorld3d(startX + dx * t, startY + dy * t);
+        if (!canOccupy3d(candidate.x, candidate.y, cs)) {
+            blocked = true;
+            break;
+        }
+        player3d.x = candidate.x;
+        player3d.y = candidate.y;
+    }
+
+    const usedDx = player3d.x - startX;
+    const usedDy = player3d.y - startY;
+    const moved = Math.hypot(usedDx, usedDy) > 1e-8;
+    return { moved, blocked, usedDx, usedDy };
+}
+
+/**
+ * Resolve one axis movement using swept collision.
+ * @param {number} delta
+ * @param {boolean} axisX
+ * @param {{passable:Array,startRect:Object|null,endRect:Object|null,pathRects:Array}} cs
+ * @returns {{moved:boolean,blocked:boolean}}
+ */
+function sweepAxis3d(delta, axisX, cs) {
+    if (Math.abs(delta) < 1e-9) return { moved: false, blocked: false };
+    const r = axisX ? sweepMove3d(delta, 0, cs) : sweepMove3d(0, delta, cs);
+    return { moved: r.moved, blocked: r.blocked };
+}
+
+/**
+>>>>>>> codex/fix-wall-collision-behavior-in-3d-maze-dlycb0
  * Play the blocked sound/status with a short cooldown to avoid audio spam while
  * a key is held down against a wall.
  */
