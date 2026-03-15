@@ -157,14 +157,6 @@ function shadeHex(hex, t) {
     return `rgb(${Math.round(r*t)},${Math.round(g*t)},${Math.round(b*t)})`;
 }
 
-// Screen-space back-face cull: returns true when the face [idx0,idx1,idx2,…]
-// winds counter-clockwise (= faces the camera) in canvas Y-down coords.
-function facingCamera(pts, i0, i1, i2) {
-    const ax = pts[i1][0]-pts[i0][0], ay = pts[i1][1]-pts[i0][1];
-    const bx = pts[i2][0]-pts[i0][0], by = pts[i2][1]-pts[i0][1];
-    return (ax*by - ay*bx) < 0;
-}
-
 // Canvas polygon fill/stroke helpers (use mazeCtx directly — it's global).
 function fillFacePts(pts, indices, color) {
     mazeCtx.beginPath();
@@ -195,7 +187,7 @@ function strokeLinePts(a, b) {
 // AND one long rectangular "house-roof" side simultaneously.
 //
 // Ghost cells (j+k ≠ currentLayer): wireframe only for passable, + dark misty
-// fill for walls.  Active cells: solid coloured fills with back-face culling.
+// fill for walls. Active cells: solid coloured fills on all prism faces.
 function drawMaze3d(pathSet) {
     const N  = gridSize3d;
     const dL = currentLayer;   // active diagonal index (avoid shadowing 'project' inner vars)
@@ -253,10 +245,10 @@ function drawMaze3d(pathSet) {
     //   wy : [(cj-ck-1)/2, (cj-ck+1)/2]   (diagonal cross-section depth)
     //   wz : [d/2, d/2+1]                   (layer height, d = cj+ck)
     //
-    // Wall cells on active layer  → solid black box (3 camera-facing faces).
-    // Passable cells on active layer → white outline of the top (horizontal) face only.
-    // Off-layer wall cells (|d-dL| < 4) → same box at 50% opacity (half as dark).
-    // Off-layer passable cells → invisible.
+    // Wall cells on active layer  → solid black box with all six faces rendered.
+    // Passable cells on active layer → full wireframe prism.
+    // Off-layer wall cells → same solid prism at ghost alpha.
+    // Off-layer passable cells → faint wireframe prism.
 
     // Return the 8 projected corners of a cell's box via worldPos, or null if any clip.
     // Corner layout (vertex indices into the lattice):
@@ -274,7 +266,7 @@ function drawMaze3d(pathSet) {
         return raw.some(p => p === null) ? null : raw;
     }
 
-    // Render a solid coloured box (back-face culled).
+    // Render a solid coloured box with all six faces.
     // Visible faces from camera at (-wy mostly, slight +wx, +wz):
     //   Front  [0,4,5,1]: diamond cross-section (faces -wy)    ← "pointed" side
     //   Left   [0,3,7,4]: flat parallelogram (faces -wx/+wz)   ← "flat left" side
@@ -291,7 +283,8 @@ function drawMaze3d(pathSet) {
         mazeCtx.lineWidth = 1.6;
         mazeCtx.strokeStyle = 'rgba(255,255,255,0.22)';
         for (const { idx, sh } of faces) {
-            if (!facingCamera(pts, idx[0], idx[1], idx[2])) continue;
+            // Draw every face so middle-mouse camera panning never reveals
+            // "missing" sides on wall prisms.
             fillFacePts(pts, idx, shadeHex(base, sh));
             strokePolyPts(pts, ...idx);
         }
