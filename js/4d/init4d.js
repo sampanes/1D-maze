@@ -1,48 +1,75 @@
 /**
  * js/4d/init4d.js
- * 
+ *
  * Entry point for the 4D Hyper-Maze Architect.
- * Binds UI controls and handles the animation loop.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
     const gridSlider = document.getElementById('gridSlider');
     const gridVal = document.getElementById('gridVal');
-    const hyperSlider = document.getElementById('hyperSlider');
-    const hyperVal = document.getElementById('hyperVal');
+    const layerPrevBtn = document.getElementById('layerPrevBtn');
+    const layerNextBtn = document.getElementById('layerNextBtn');
+    const layerDisplay = document.getElementById('layerDisplay');
+    const hyperPrevBtn = document.getElementById('hyperPrevBtn');
+    const hyperNextBtn = document.getElementById('hyperNextBtn');
+    const hyperDisplay = document.getElementById('hyperDisplay');
     const btnResetView = document.getElementById('btnResetView');
 
-    // ── Initial State ────────────────────────────────────────────────────────
+    function updateLayerDisplays() {
+        const maxLayer = maxLayerIndex4d();
+        // Match 3D page convention: higher displayed layer means visually upward.
+        layerDisplay.textContent = String(maxLayer + 1 - layerOffset3d);
+        hyperDisplay.textContent = String(maxLayer + 1 - hyperOffset);
+    }
 
     function reset4d(n) {
         initGrid4d(n);
-        
-        // Max hyper-offset is 2N - 2 (since ia+id can range from 0+0 to (N-1)+(N-1))
-        const maxHyper = 2 * n - 2;
-        hyperSlider.max = maxHyper;
-        hyperSlider.value = n - 1; // Start at center
-        hyperOffset = n - 1;
-        hyperVal.textContent = parseFloat(hyperSlider.value).toFixed(1);
-        
+        const center = n - 1;
+        layerOffset3d = center;
+        hyperOffset = center;
+        updateLayerDisplays();
         drawHyperVolume4d();
     }
 
-    // Initialize 4D renderer
     initRender4d();
-    reset4d(parseInt(gridSlider.value));
-
-    // ── UI Listeners ─────────────────────────────────────────────────────────
+    reset4d(parseInt(gridSlider.value, 10));
 
     gridSlider.addEventListener('input', () => {
-        const n = parseInt(gridSlider.value);
-        gridVal.textContent = n;
+        const n = parseInt(gridSlider.value, 10);
+        gridVal.textContent = String(n);
         reset4d(n);
     });
 
-    hyperSlider.addEventListener('input', () => {
-        hyperOffset = parseFloat(hyperSlider.value);
-        hyperVal.textContent = hyperOffset.toFixed(1);
-        drawHyperVolume4d();
+    layerPrevBtn.addEventListener('click', () => {
+        if (layerOffset3d < maxLayerIndex4d()) {
+            layerOffset3d++;
+            updateLayerDisplays();
+            drawHyperVolume4d();
+        }
+    });
+
+    layerNextBtn.addEventListener('click', () => {
+        if (layerOffset3d > 0) {
+            layerOffset3d--;
+            updateLayerDisplays();
+            drawHyperVolume4d();
+        }
+    });
+
+    hyperPrevBtn.addEventListener('click', () => {
+        if (hyperOffset < maxLayerIndex4d()) {
+            hyperOffset++;
+            updateLayerDisplays();
+            drawHyperVolume4d();
+        }
+    });
+
+    hyperNextBtn.addEventListener('click', () => {
+        if (hyperOffset > 0) {
+            hyperOffset--;
+            updateLayerDisplays();
+            drawHyperVolume4d();
+        }
     });
 
     btnResetView.addEventListener('click', () => {
@@ -51,33 +78,31 @@ document.addEventListener('DOMContentLoaded', () => {
         drawHyperVolume4d();
     });
 
-    // ── Mouse Rotation (MMB or R+Drag) ───────────────────────────────────────
-
     let isRotating = false;
     let lastMouseX = 0;
     let lastMouseY = 0;
+    let rotateKeyHeld = false;
 
     hyperCanvas.addEventListener('mousedown', (e) => {
-        if (e.button === 1 || (e.button === 0 && e.shiftKey)) { // MMB or Shift+LMB
-            isRotating = true;
-            lastMouseX = e.clientX;
-            lastMouseY = e.clientY;
-            e.preventDefault();
-        }
+        const middleDrag = e.button === 1;
+        const rDrag = rotateKeyHeld && e.button === 0;
+        if (!middleDrag && !rDrag) return;
+        isRotating = true;
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+        e.preventDefault();
     });
 
     window.addEventListener('mousemove', (e) => {
         if (!isRotating) return;
-        
         const dx = e.clientX - lastMouseX;
         const dy = e.clientY - lastMouseY;
-        
+
         cameraAz4d -= dx * 0.01;
-        cameraEl4d = Math.max(-Math.PI/2, Math.min(Math.PI/2, cameraEl4d + dy * 0.01));
-        
+        cameraEl4d = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraEl4d + dy * 0.01));
+
         lastMouseX = e.clientX;
         lastMouseY = e.clientY;
-        
         drawHyperVolume4d();
     });
 
@@ -85,20 +110,11 @@ document.addEventListener('DOMContentLoaded', () => {
         isRotating = false;
     });
 
-    // Handle "R" key for rotation as well
-    let rPressed = false;
     window.addEventListener('keydown', (e) => {
-        if (e.key.toLowerCase() === 'r') rPressed = true;
-    });
-    window.addEventListener('keyup', (e) => {
-        if (e.key.toLowerCase() === 'r') rPressed = false;
+        if (e.code === 'KeyR') rotateKeyHeld = true;
     });
 
-    hyperCanvas.addEventListener('mousedown', (e) => {
-        if (rPressed && e.button === 0) {
-            isRotating = true;
-            lastMouseX = e.clientX;
-            lastMouseY = e.clientY;
-        }
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'KeyR') rotateKeyHeld = false;
     });
 });
