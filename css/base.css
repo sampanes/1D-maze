@@ -38,6 +38,24 @@ body {
     color: #9bb0d9;
 }
 
+
+.header-nav-links {
+    margin-top: 8px;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+.layer-nav-btn {
+    padding: 4px 10px;
+    background: rgba(255,255,255,0.07);
+    color: #9db1d8;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.1);
+    font-weight: 700;
+    cursor: pointer;
+}
+
 .controls {
     display: flex;
     flex-wrap: wrap;
