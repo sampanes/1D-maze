@@ -5,19 +5,27 @@
  */
 
 const SQRT2_4D = Math.SQRT2;
+// Units are "grid-cells per second" in slice-space S.
+// Kept conservative so occupancy stabilization has time to keep the player legal.
 const HYPER_SLICE_SPEED = 3.2;
 
 let gridSize4d = 5;
+// Storage order is [w][z][y][x] (outermost to innermost) so selecting one W layer
+// is a simple first-index access in edit mode.
 let grid4d = []; // [w][z][y][x]
 
 let layerOffset3d = 0;
-let hyperOffset = 0; // discrete edit layer index (w)
-let hyperSliceOffset = 0; // continuous scan slice offset (S)
+// `hyperOffset` is the discrete W index used while editing.
+let hyperOffset = 0;
+// `hyperSliceOffset` is the continuous scan parameter S used by x+w=constant slicing.
+let hyperSliceOffset = 0;
 let scanActive4d = false;
 let keysDown4d = {};
 let player4d = { x: 0, y: 0, z: 0 };
 
 function getAnchorLayerZ4d() {
+    // Start/end anchors are pinned to the central Z layer to give a stable
+    // reference plane independent of chosen W layer.
     return Math.floor(gridSize4d / 2);
 }
 
@@ -56,6 +64,8 @@ function clamp4d(v, lo, hi) {
 }
 
 function initGrid4d(n) {
+    // Dense 4D array is acceptable here because N is intentionally small (3..10).
+    // This keeps lookup logic straightforward for rendering and occupancy tests.
     gridSize4d = n;
     grid4d = Array.from({ length: n }, () =>
         Array.from({ length: n }, () =>
@@ -65,6 +75,7 @@ function initGrid4d(n) {
         )
     );
 
+    // Initialize user context in the middle of the available layer ranges.
     const center = Math.floor(n / 2);
     layerOffset3d = center;
     hyperOffset = center;
@@ -82,6 +93,8 @@ function inBounds4d(x, y, z, w = hyperOffset) {
 }
 
 function getCell4d(x, y, z, w = hyperOffset) {
+    // Out-of-bounds reads return wall semantics (1), which naturally blocks movement
+    // and avoids needing special boundary checks at every call site.
     if (!inBounds4d(x, y, z, w)) return 1;
     return grid4d[w][z][y][x];
 }
@@ -100,11 +113,15 @@ function toggleCell4d(x, y, z, w = hyperOffset) {
 }
 
 function getSliceBounds4d() {
+    // Tiny epsilon margin avoids exactly hitting degenerate boundaries where
+    // numerical noise can make cells flicker in/out at the extremes.
     const max = gridSize4d * SQRT2_4D;
     return { min: 0.0001, max: max - 0.0001 };
 }
 
 function hyperOffsetToSlice4d(wIndex) {
+    // Convert discrete W-layer center to slice-space coordinate S.
+    // The +0.5 targets cell center rather than left boundary.
     return (wIndex + 0.5) / SQRT2_4D;
 }
 
@@ -119,6 +136,8 @@ function getClosestWForSliceAndX(x, C = getSliceEquationConstant4d()) {
 
 function canOccupyPlayer4d(x, y, z) {
     if (scanActive4d) {
+        // In scan mode, occupancy means "there exists at least one W cell intersected
+        // by the current slice that is empty" for this (x,y,z) coordinate.
         if (!inBounds4d(x, y, z, 0)) return false;
         for (let w = 0; w < gridSize4d; w++) {
             if (getCellSliceSegment4d(x, y, z, w, hyperSliceOffset) && getCell4d(x, y, z, w) === 0) return true;
@@ -142,6 +161,9 @@ function movePlayer4d(dx, dy, dz) {
 }
 
 function stabilizePlayer4d() {
+    // Safety net: when mode/layer/slice changes invalidate player position,
+    // search nearest legal cell by expanding Manhattan radius.
+    // If none exists, fall back to start anchor.
     if (canOccupyPlayer4d(player4d.x, player4d.y, player4d.z)) return true;
 
     const maxRadius = gridSize4d - 1;
@@ -171,6 +193,8 @@ function stabilizePlayer4d() {
 }
 
 function getCellSliceSegment4d(x, y, z, w, sliceS = hyperSliceOffset) {
+    // Core geometry: intersect 4D unit hypercube at (x,y,z,w) with hyperplane x+w=C,
+    // expressed in rotated 3D scan coordinates for visualization.
     const C = sliceS * SQRT2_4D;
     const xMin = Math.max(x, C - (w + 1));
     const xMax = Math.min(x + 1, C - w);
@@ -190,6 +214,7 @@ function updateHyperSliceFromInput4d(dt) {
     if (!scanActive4d) return false;
 
     let dir = 0;
+    // E/D chosen as adjacent keys for smooth positive/negative W traversal.
     if (keysDown4d['KeyE']) dir += 1;
     if (keysDown4d['KeyD']) dir -= 1;
     if (!dir) return false;
@@ -203,8 +228,10 @@ function updateHyperSliceFromInput4d(dt) {
 function setScanActive4d(active) {
     scanActive4d = !!active;
     if (scanActive4d) {
+        // Enter scan from the center of the currently edited W layer so there is no jump.
         hyperSliceOffset = hyperOffsetToSlice4d(hyperOffset);
     } else {
+        // Exit scan by snapping continuous S back to nearest discrete W index.
         hyperOffset = clamp4d(Math.round(hyperSliceOffset * SQRT2_4D - 0.5), 0, maxLayerIndex4d());
     }
     stabilizePlayer4d();
