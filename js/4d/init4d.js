@@ -29,11 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function reset4d(n) {
         initGrid4d(n);
         updateLayerDisplays();
-<<<<<<< HEAD
         setStatus('Click cubes on the active Layer to paint walls. Start/End are opposite corners on the same cross-section. Arrow keys move x/y, W/S move z.');
-=======
-        setStatus('Click cubes on the active Layer to paint walls. Arrow keys move x/y, W/S move z.');
->>>>>>> main
         drawHyperVolume4d();
     }
 
@@ -106,14 +102,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-<<<<<<< HEAD
         if (isAnchorCell4d(picked.x, picked.y, picked.z)) {
             setStatus('Start/End anchors are fixed and cannot be painted.', 'info');
             return;
         }
-
-=======
->>>>>>> main
         toggleCell4d(picked.x, picked.y, picked.z, hyperOffset);
         stabilizePlayerAfterHyperShift();
         drawHyperVolume4d();
@@ -156,7 +148,11 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         drawHyperVolume4d();
         if (moved) {
-            setStatus(`Player moved to (${player4d.x}, ${player4d.y}, ${player4d.z}) on 4D layer ${hyperOffset + 1}.`, 'neutral');
+            if (playerReachedEnd4d()) {
+                setStatus('Scan complete! Reached the end anchor on this cross-section.', 'success');
+            } else {
+                setStatus(`Player moved to (${player4d.x}, ${player4d.y}, ${player4d.z}) on 4D layer ${hyperOffset + 1}.`, 'neutral');
+            }
         } else {
             setStatus('Blocked: target cell is out of bounds or a wall.', 'error');
         }

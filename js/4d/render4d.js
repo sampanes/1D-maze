@@ -96,7 +96,9 @@ function drawHyperVolume4d() {
                     depth,
                     isWall,
                     isActiveLayer: z === layerOffset3d,
-                    isPlayer: player4d.x === x && player4d.y === y && player4d.z === z
+                    isPlayer: player4d.x === x && player4d.y === y && player4d.z === z,
+                    isStart: isStartCell4d(x, y, z),
+                    isEnd: isEndCell4d(x, y, z)
                 });
             }
         }
@@ -116,17 +118,31 @@ function drawCube(cube) {
         [4, 5, 6, 7]
     ];
 
-    let baseColor = cube.isWall ? [40, 50, 70] : [95, 145, 235];
-    let alpha = cube.isWall ? 0.84 : 0.16;
+    const isInactiveLayer = !cube.isActiveLayer;
 
+    // Keep inactive layers nearly ghosted so the active edit layer reads clearly.
+    let baseColor = cube.isWall ? [22, 28, 42] : [95, 145, 235];
+    let alpha = cube.isWall ? 0.14 : 0.03;
+
+    // Active layer should match the darker, high-contrast wall style used in 2D/3D.
     if (cube.isActiveLayer) {
-        baseColor = cube.isWall ? [70, 90, 130] : [115, 180, 255];
-        alpha = cube.isWall ? 0.88 : 0.28;
+        baseColor = cube.isWall ? [12, 16, 28] : [115, 180, 255];
+        alpha = cube.isWall ? 0.94 : 0.34;
+    }
+
+    if (cube.isStart) {
+        baseColor = [93, 255, 176];
+        alpha = cube.isActiveLayer ? 0.92 : 0.34;
+    }
+
+    if (cube.isEnd) {
+        baseColor = [255, 106, 106];
+        alpha = cube.isActiveLayer ? 0.92 : 0.34;
     }
 
     if (cube.isPlayer) {
         baseColor = [125, 255, 46];
-        alpha = 0.85;
+        alpha = 0.9;
     }
 
     faces.forEach((face, i) => {
@@ -143,8 +159,8 @@ function drawCube(cube) {
 
         hyperCtx.strokeStyle = cube.isPlayer
             ? 'rgba(220,255,180,0.95)'
-            : `rgba(255,255,255,${cube.isWall ? 0.24 : 0.12})`;
-        hyperCtx.lineWidth = cube.isPlayer ? 1.5 : 1;
+            : `rgba(255,255,255,${isInactiveLayer ? 0.03 : (cube.isWall ? 0.22 : 0.11)})`;
+        hyperCtx.lineWidth = cube.isPlayer ? 1.5 : (isInactiveLayer ? 0.6 : 1);
         hyperCtx.stroke();
     });
 }

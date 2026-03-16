@@ -11,6 +11,36 @@ let layerOffset3d = 0;
 let hyperOffset = 0;
 let player4d = { x: 0, y: 0, z: 0 };
 
+function getAnchorLayerZ4d() {
+    return Math.floor(gridSize4d / 2);
+}
+
+function getStartCell4d() {
+    return { x: 0, y: 0, z: getAnchorLayerZ4d() };
+}
+
+function getEndCell4d() {
+    return { x: gridSize4d - 1, y: gridSize4d - 1, z: getAnchorLayerZ4d() };
+}
+
+function isStartCell4d(x, y, z) {
+    const start = getStartCell4d();
+    return x === start.x && y === start.y && z === start.z;
+}
+
+function isEndCell4d(x, y, z) {
+    const end = getEndCell4d();
+    return x === end.x && y === end.y && z === end.z;
+}
+
+function isAnchorCell4d(x, y, z) {
+    return isStartCell4d(x, y, z) || isEndCell4d(x, y, z);
+}
+
+function playerReachedEnd4d() {
+    return isEndCell4d(player4d.x, player4d.y, player4d.z);
+}
+
 function maxLayerIndex4d() {
     return gridSize4d - 1;
 }
@@ -32,7 +62,9 @@ function initGrid4d(n) {
     const center = Math.floor(n / 2);
     layerOffset3d = center;
     hyperOffset = center;
-    player4d = { x: center, y: center, z: center };
+
+    const start = getStartCell4d();
+    player4d = { x: start.x, y: start.y, z: start.z };
 }
 
 function inBounds4d(x, y, z, w = hyperOffset) {
@@ -53,6 +85,7 @@ function setCell4d(x, y, z, w, value) {
 
 function toggleCell4d(x, y, z, w = hyperOffset) {
     if (!inBounds4d(x, y, z, w)) return false;
+    if (isAnchorCell4d(x, y, z)) return false;
     grid4d[w][z][y][x] = grid4d[w][z][y][x] ? 0 : 1;
     return true;
 }
@@ -98,8 +131,8 @@ function stabilizePlayerAfterHyperShift() {
         }
     }
 
-    const c = Math.floor(gridSize4d / 2);
-    player4d = { x: c, y: c, z: c };
+    const start = getStartCell4d();
+    player4d = { x: start.x, y: start.y, z: start.z };
     return canOccupyPlayer4d(player4d.x, player4d.y, player4d.z, hyperOffset);
 }
 
