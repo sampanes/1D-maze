@@ -1,7 +1,7 @@
 /**
  * js/4d/init4d.js
  *
- * Entry point for the 4D Hyper-Maze Architect.
+ * Entry point and controls for the 4D editor/scanner.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -14,20 +14,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const hyperNextBtn = document.getElementById('hyperNextBtn');
     const hyperDisplay = document.getElementById('hyperDisplay');
     const btnResetView = document.getElementById('btnResetView');
+    const statusBar = document.getElementById('statusBar');
+
+    function setStatus(message, cls = 'neutral') {
+        statusBar.className = `status-bar ${cls}`;
+        statusBar.textContent = message;
+    }
 
     function updateLayerDisplays() {
-        const maxLayer = maxLayerIndex4d();
-        // Match 3D page convention: higher displayed layer means visually upward.
-        layerDisplay.textContent = String(maxLayer + 1 - layerOffset3d);
-        hyperDisplay.textContent = String(maxLayer + 1 - hyperOffset);
+        layerDisplay.textContent = String(layerOffset3d + 1);
+        hyperDisplay.textContent = String(hyperOffset + 1);
     }
 
     function reset4d(n) {
         initGrid4d(n);
-        const center = n - 1;
-        layerOffset3d = center;
-        hyperOffset = center;
         updateLayerDisplays();
+        setStatus('Click cubes on the active Layer to paint walls. Start/End are opposite corners on the same cross-section. Arrow keys move x/y, W/S move z.');
         drawHyperVolume4d();
     }
 
@@ -41,35 +43,29 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     layerPrevBtn.addEventListener('click', () => {
-        if (layerOffset3d < maxLayerIndex4d()) {
-            layerOffset3d++;
-            updateLayerDisplays();
-            drawHyperVolume4d();
-        }
+        layerOffset3d = clamp4d(layerOffset3d - 1, 0, maxLayerIndex4d());
+        updateLayerDisplays();
+        drawHyperVolume4d();
     });
 
     layerNextBtn.addEventListener('click', () => {
-        if (layerOffset3d > 0) {
-            layerOffset3d--;
-            updateLayerDisplays();
-            drawHyperVolume4d();
-        }
+        layerOffset3d = clamp4d(layerOffset3d + 1, 0, maxLayerIndex4d());
+        updateLayerDisplays();
+        drawHyperVolume4d();
     });
 
     hyperPrevBtn.addEventListener('click', () => {
-        if (hyperOffset < maxLayerIndex4d()) {
-            hyperOffset++;
-            updateLayerDisplays();
-            drawHyperVolume4d();
-        }
+        hyperOffset = clamp4d(hyperOffset - 1, 0, maxLayerIndex4d());
+        stabilizePlayerAfterHyperShift();
+        updateLayerDisplays();
+        drawHyperVolume4d();
     });
 
     hyperNextBtn.addEventListener('click', () => {
-        if (hyperOffset > 0) {
-            hyperOffset--;
-            updateLayerDisplays();
-            drawHyperVolume4d();
-        }
+        hyperOffset = clamp4d(hyperOffset + 1, 0, maxLayerIndex4d());
+        stabilizePlayerAfterHyperShift();
+        updateLayerDisplays();
+        drawHyperVolume4d();
     });
 
     btnResetView.addEventListener('click', () => {
@@ -93,6 +89,30 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
     });
 
+    hyperCanvas.addEventListener('click', (e) => {
+        if (isRotating) return;
+        const picked = pickCellFromScreen4d(e.clientX, e.clientY);
+        if (!picked) {
+            setStatus('No cube selected. Try clicking closer to a visible cube center.', 'info');
+            return;
+        }
+
+        if (picked.z !== layerOffset3d) {
+            setStatus(`Selected cube is on layer ${picked.z + 1}. Switch Layer to ${picked.z + 1} to edit it.`, 'info');
+            return;
+        }
+
+        if (isAnchorCell4d(picked.x, picked.y, picked.z)) {
+            setStatus('Start/End anchors are fixed and cannot be painted.', 'info');
+            return;
+        }
+
+        toggleCell4d(picked.x, picked.y, picked.z, hyperOffset);
+        stabilizePlayerAfterHyperShift();
+        drawHyperVolume4d();
+        setStatus(`Toggled cell (${picked.x}, ${picked.y}, ${picked.z}) on 4D layer ${hyperOffset + 1}.`, 'success');
+    });
+
     window.addEventListener('mousemove', (e) => {
         if (!isRotating) return;
         const dx = e.clientX - lastMouseX;
@@ -111,7 +131,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.addEventListener('keydown', (e) => {
-        if (e.code === 'KeyR') rotateKeyHeld = true;
+        if (e.repeat) return;
+        if (e.code === 'KeyR') {
+            rotateKeyHeld = true;
+            return;
+        }
+
+        let moved = false;
+        if (e.code === 'ArrowLeft') moved = movePlayer4d(-1, 0, 0);
+        else if (e.code === 'ArrowRight') moved = movePlayer4d(1, 0, 0);
+        else if (e.code === 'ArrowUp') moved = movePlayer4d(0, -1, 0);
+        else if (e.code === 'ArrowDown') moved = movePlayer4d(0, 1, 0);
+        else if (e.code === 'KeyW') moved = movePlayer4d(0, 0, 1);
+        else if (e.code === 'KeyS') moved = movePlayer4d(0, 0, -1);
+        else return;
+
+        e.preventDefault();
+        drawHyperVolume4d();
+        if (moved) {
+            setStatus(`Player moved to (${player4d.x}, ${player4d.y}, ${player4d.z}) on 4D layer ${hyperOffset + 1}.`, 'neutral');
+        } else {
+            setStatus('Blocked: target cell is out of bounds or a wall.', 'error');
+        }
     });
 
     window.addEventListener('keyup', (e) => {
