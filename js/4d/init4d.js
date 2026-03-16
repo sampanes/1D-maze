@@ -17,6 +17,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnResetView = document.getElementById('btnResetView');
     const statusBar = document.getElementById('statusBar');
 
+    let isRotating = false;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+    let rotateKeyHeld = false;
+    let lastFrame4d = performance.now();
+
     function setStatus(message, cls = 'neutral') {
         statusBar.className = `status-bar ${cls}`;
         statusBar.textContent = message;
@@ -24,23 +30,49 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateLayerDisplays() {
         layerDisplay.textContent = String(layerOffset3d + 1);
-        hyperDisplay.textContent = String(hyperOffset + 1);
+        if (scanActive4d) {
+            hyperDisplay.textContent = hyperSliceOffset.toFixed(2);
+        } else {
+            hyperDisplay.textContent = String(hyperOffset + 1);
+        }
     }
 
-    function updateScanButtonState() {
-        btnScan.disabled = false;
+    function updateUiForMode() {
+        const editMode = !scanActive4d;
+        layerPrevBtn.disabled = !editMode;
+        layerNextBtn.disabled = !editMode;
+        hyperPrevBtn.disabled = !editMode;
+        hyperNextBtn.disabled = !editMode;
+        btnScan.textContent = scanActive4d ? 'Stop Scan' : 'Start Scan';
+        updateLayerDisplays();
     }
 
     function reset4d(n) {
         initGrid4d(n);
-        updateLayerDisplays();
-        setStatus('Click cubes on the active Layer to paint walls. Start/End are opposite corners on the same cross-section. Arrow keys move x/y, W/S move z.');
+        updateUiForMode();
+        setStatus('Edit mode: click cubes on the active Layer to paint walls. Start/End are opposite corners on the same cross-section.', 'neutral');
         drawHyperVolume4d();
-        updateScanButtonState();
+        btnScan.disabled = false;
+    }
+
+    function tick4d(ts) {
+        const dt = Math.min(0.05, (ts - lastFrame4d) / 1000);
+        lastFrame4d = ts;
+
+        let needsRedraw = false;
+        if (updateHyperSliceFromInput4d(dt)) needsRedraw = true;
+
+        if (needsRedraw) {
+            updateLayerDisplays();
+            drawHyperVolume4d();
+        }
+
+        requestAnimationFrame(tick4d);
     }
 
     initRender4d();
     reset4d(parseInt(gridSlider.value, 10));
+    requestAnimationFrame(tick4d);
 
     gridSlider.addEventListener('input', () => {
         const n = parseInt(gridSlider.value, 10);
@@ -62,14 +94,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     hyperPrevBtn.addEventListener('click', () => {
         hyperOffset = clamp4d(hyperOffset - 1, 0, maxLayerIndex4d());
-        stabilizePlayerAfterHyperShift();
+        stabilizePlayer4d();
         updateLayerDisplays();
         drawHyperVolume4d();
     });
 
     hyperNextBtn.addEventListener('click', () => {
         hyperOffset = clamp4d(hyperOffset + 1, 0, maxLayerIndex4d());
-        stabilizePlayerAfterHyperShift();
+        stabilizePlayer4d();
         updateLayerDisplays();
         drawHyperVolume4d();
     });
@@ -81,13 +113,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     btnScan.addEventListener('click', () => {
-        setStatus('Scan mode is not wired yet in 4D. This button is a placeholder for upcoming scanner flow.', 'info');
+        setScanActive4d(!scanActive4d);
+        updateUiForMode();
+        drawHyperVolume4d();
+        if (scanActive4d) {
+            setStatus('Scan mode: Arrow keys move x/y, W/S move z, and E/D smoothly shift the hyper-slice through 4D.', 'info');
+        } else {
+            setStatus('Returned to edit mode. Layer controls and painting are enabled again.', 'neutral');
+        }
     });
-
-    let isRotating = false;
-    let lastMouseX = 0;
-    let lastMouseY = 0;
-    let rotateKeyHeld = false;
 
     hyperCanvas.addEventListener('mousedown', (e) => {
         const middleDrag = e.button === 1;
@@ -101,19 +135,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     hyperCanvas.addEventListener('click', (e) => {
         if (isRotating) return;
+        if (scanActive4d) {
+            setStatus('Painting is disabled during scan mode. Stop scan to edit cells.', 'info');
+            return;
+        }
+
         const picked = pickCellFromScreen4d(e.clientX, e.clientY, layerOffset3d);
         if (!picked) {
             setStatus('No cube selected. Try clicking closer to a visible cube center.', 'info');
             return;
         }
 
-
         if (isAnchorCell4d(picked.x, picked.y, picked.z)) {
             setStatus('Start/End anchors are fixed and cannot be painted.', 'info');
             return;
         }
         toggleCell4d(picked.x, picked.y, picked.z, hyperOffset);
-        stabilizePlayerAfterHyperShift();
+        stabilizePlayer4d();
         drawHyperVolume4d();
         setStatus(`Toggled cell (${picked.x}, ${picked.y}, ${picked.z}) on 4D layer ${hyperOffset + 1}.`, 'success');
     });
@@ -136,11 +174,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.addEventListener('keydown', (e) => {
-        if (e.repeat) return;
+        keysDown4d[e.code] = true;
         if (e.code === 'KeyR') {
             rotateKeyHeld = true;
             return;
         }
+
+        if (e.repeat) return;
 
         let moved = false;
         if (e.code === 'ArrowLeft') moved = movePlayer4d(-1, 0, 0);
@@ -149,7 +189,10 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (e.code === 'ArrowDown') moved = movePlayer4d(0, 1, 0);
         else if (e.code === 'KeyW') moved = movePlayer4d(0, 0, 1);
         else if (e.code === 'KeyS') moved = movePlayer4d(0, 0, -1);
-        else return;
+        else if (e.code === 'KeyE' || e.code === 'KeyD') {
+            if (scanActive4d) e.preventDefault();
+            return;
+        } else return;
 
         e.preventDefault();
         drawHyperVolume4d();
@@ -157,14 +200,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (playerReachedEnd4d()) {
                 setStatus('Scan complete! Reached the end anchor on this cross-section.', 'success');
             } else {
-                setStatus(`Player moved to (${player4d.x}, ${player4d.y}, ${player4d.z}) on 4D layer ${hyperOffset + 1}.`, 'neutral');
+                setStatus(`Player moved to (${player4d.x}, ${player4d.y}, ${player4d.z}).`, 'neutral');
             }
         } else {
-            setStatus('Blocked: target cell is out of bounds or a wall.', 'error');
+            setStatus('Blocked: target cell is out of bounds or not present in the current slice.', 'error');
         }
     });
 
     window.addEventListener('keyup', (e) => {
+        delete keysDown4d[e.code];
         if (e.code === 'KeyR') rotateKeyHeld = false;
     });
 });

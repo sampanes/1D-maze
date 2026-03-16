@@ -1,7 +1,7 @@
 /**
  * js/4d/render4d.js
  *
- * 3D renderer for a selected W-layer in the 4D voxel stack.
+ * 3D renderer for edit-layer view and 4D scan cross-sections.
  */
 
 let hyperCtx;
@@ -51,14 +51,19 @@ function project3d(x, y, z, N) {
 }
 
 function drawHyperVolume4d() {
+    hyperCtx.clearRect(0, 0, hyperCanvas.width, hyperCanvas.height);
+    pickCells4d = [];
+
+    if (scanActive4d) drawScanSlice4d();
+    else drawEditLayer4d();
+}
+
+function drawEditLayer4d() {
     const N = gridSize4d;
     const w = hyperOffset;
     const flatten = getFlattenFactorForHyperLayer();
     const zCenter = (N - 1) / 2;
     const thickness = Math.max(0.06, flatten);
-
-    hyperCtx.clearRect(0, 0, hyperCanvas.width, hyperCanvas.height);
-    pickCells4d = [];
 
     const cubes = [];
 
@@ -72,24 +77,18 @@ function drawHyperVolume4d() {
                 const isWall = getCell4d(x, y, z, w) === 1;
 
                 const cornersWorld = [
-                    [x - 0.5, y - 0.5, z0],
-                    [x + 0.5, y - 0.5, z0],
-                    [x + 0.5, y + 0.5, z0],
-                    [x - 0.5, y + 0.5, z0],
-                    [x - 0.5, y - 0.5, z1],
-                    [x + 0.5, y - 0.5, z1],
-                    [x + 0.5, y + 0.5, z1],
-                    [x - 0.5, y + 0.5, z1]
+                    [x - 0.5, y - 0.5, z0], [x + 0.5, y - 0.5, z0],
+                    [x + 0.5, y + 0.5, z0], [x - 0.5, y + 0.5, z0],
+                    [x - 0.5, y - 0.5, z1], [x + 0.5, y - 0.5, z1],
+                    [x + 0.5, y + 0.5, z1], [x - 0.5, y + 0.5, z1]
                 ];
 
-                const corners = cornersWorld.map((p) => project3d(p[0], p[1], p[2], N));
-                if (corners.some((p) => p === null)) continue;
+                const corners = cornersWorld.map((pt) => project3d(pt[0], pt[1], pt[2], N));
+                if (corners.some((pt) => pt === null)) continue;
 
-                const depth = corners.reduce((acc, p) => acc + p[2], 0) / corners.length;
+                const depth = corners.reduce((acc, pt) => acc + pt[2], 0) / corners.length;
                 const centerProj = project3d(x, y, zMapped, N);
-                if (centerProj) {
-                    pickCells4d.push({ x, y, z, depth, sx: centerProj[0], sy: centerProj[1] });
-                }
+                if (centerProj) pickCells4d.push({ x, y, z, depth, sx: centerProj[0], sy: centerProj[1] });
 
                 cubes.push({
                     corners,
@@ -98,7 +97,8 @@ function drawHyperVolume4d() {
                     isActiveLayer: z === layerOffset3d,
                     isPlayer: player4d.x === x && player4d.y === y && player4d.z === z,
                     isStart: isStartCell4d(x, y, z),
-                    isEnd: isEndCell4d(x, y, z)
+                    isEnd: isEndCell4d(x, y, z),
+                    mode: 'edit'
                 });
             }
         }
@@ -108,26 +108,85 @@ function drawHyperVolume4d() {
     cubes.forEach((cube) => drawCube(cube));
 }
 
+function drawScanSlice4d() {
+    const N = gridSize4d;
+    const cubes = [];
+
+    const scanScale = SQRT2_4D;
+    const scanCenter = ((N * scanScale) / 2);
+    const worldCenter = (N - 1) / 2;
+
+    const toWorld = (v) => ((v - scanCenter) / scanScale) + worldCenter;
+
+    for (let w = 0; w < N; w++) {
+        for (let z = 0; z < N; z++) {
+            for (let y = 0; y < N; y++) {
+                for (let x = 0; x < N; x++) {
+                    const seg = getCellSliceSegment4d(x, y, z, w, hyperSliceOffset);
+                    if (!seg) continue;
+
+                    const isWall = getCell4d(x, y, z, w) === 1;
+                    const cornersWorld = [
+                        [toWorld(seg.x0), toWorld(seg.y0), toWorld(seg.z0)],
+                        [toWorld(seg.x1), toWorld(seg.y0), toWorld(seg.z0)],
+                        [toWorld(seg.x1), toWorld(seg.y1), toWorld(seg.z0)],
+                        [toWorld(seg.x0), toWorld(seg.y1), toWorld(seg.z0)],
+                        [toWorld(seg.x0), toWorld(seg.y0), toWorld(seg.z1)],
+                        [toWorld(seg.x1), toWorld(seg.y0), toWorld(seg.z1)],
+                        [toWorld(seg.x1), toWorld(seg.y1), toWorld(seg.z1)],
+                        [toWorld(seg.x0), toWorld(seg.y1), toWorld(seg.z1)]
+                    ];
+
+                    const corners = cornersWorld.map((pt) => project3d(pt[0], pt[1], pt[2], N));
+                    if (corners.some((pt) => pt === null)) continue;
+
+                    const depth = corners.reduce((acc, pt) => acc + pt[2], 0) / corners.length;
+
+                    const centerProj = project3d(
+                        toWorld((seg.x0 + seg.x1) * 0.5),
+                        toWorld((seg.y0 + seg.y1) * 0.5),
+                        toWorld((seg.z0 + seg.z1) * 0.5),
+                        N
+                    );
+                    if (centerProj && w === hyperOffset) {
+                        pickCells4d.push({ x, y, z, depth, sx: centerProj[0], sy: centerProj[1] });
+                    }
+
+                    cubes.push({
+                        corners,
+                        depth,
+                        isWall,
+                        isActiveLayer: w === hyperOffset,
+                        isPlayer: player4d.x === x && player4d.y === y && player4d.z === z,
+                        isStart: isStartCell4d(x, y, z),
+                        isEnd: isEndCell4d(x, y, z),
+                        mode: 'scan'
+                    });
+                }
+            }
+        }
+    }
+
+    cubes.sort((a, b) => b.depth - a.depth);
+    cubes.forEach((cube) => drawCube(cube));
+}
+
 function drawCube(cube) {
-    const faces = [
-        [0, 1, 5, 4],
-        [1, 2, 6, 5],
-        [2, 3, 7, 6],
-        [3, 0, 4, 7],
-        [0, 1, 2, 3],
-        [4, 5, 6, 7]
-    ];
+    const faces = [[0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7], [0, 1, 2, 3], [4, 5, 6, 7]];
 
     const isInactiveLayer = !cube.isActiveLayer;
 
-    // Keep inactive layers nearly ghosted so the active edit layer reads clearly.
     let baseColor = cube.isWall ? [22, 28, 42] : [95, 145, 235];
     let alpha = cube.isWall ? 0.14 : 0.03;
 
-    // Active layer should match the darker, high-contrast wall style used in 2D/3D.
     if (cube.isActiveLayer) {
         baseColor = cube.isWall ? [12, 16, 28] : [115, 180, 255];
         alpha = cube.isWall ? 0.94 : 0.34;
+    }
+
+    if (cube.mode === 'scan') {
+        alpha = cube.isWall ? 0.84 : 0.07;
+        if (isInactiveLayer) alpha *= 0.68;
     }
 
     if (cube.isStart) {
@@ -148,9 +207,7 @@ function drawCube(cube) {
     faces.forEach((face, i) => {
         hyperCtx.beginPath();
         hyperCtx.moveTo(cube.corners[face[0]][0], cube.corners[face[0]][1]);
-        for (let j = 1; j < face.length; j++) {
-            hyperCtx.lineTo(cube.corners[face[j]][0], cube.corners[face[j]][1]);
-        }
+        for (let j = 1; j < face.length; j++) hyperCtx.lineTo(cube.corners[face[j]][0], cube.corners[face[j]][1]);
         hyperCtx.closePath();
 
         const shade = 0.56 + (i * 0.08);
@@ -182,9 +239,7 @@ function pickCellFromScreen4d(clientX, clientY, targetLayer = null) {
         const dist2 = dx * dx + dy * dy;
         if (dist2 > threshold * threshold) continue;
 
-        if (!best || dist2 < best.dist2 - 1e-6 || (Math.abs(dist2 - best.dist2) < 1e-6 && cell.depth > best.depth)) {
-            best = { ...cell, dist2 };
-        }
+        if (!best || dist2 < best.dist2 - 1e-6 || (Math.abs(dist2 - best.dist2) < 1e-6 && cell.depth > best.depth)) best = { ...cell, dist2 };
     }
 
     if (!best) return null;
