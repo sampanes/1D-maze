@@ -4,11 +4,17 @@
  * Core state and interaction model for the 4D editor/scanner.
  */
 
+const SQRT2_4D = Math.SQRT2;
+const HYPER_SLICE_SPEED = 3.2;
+
 let gridSize4d = 5;
 let grid4d = []; // [w][z][y][x]
 
 let layerOffset3d = 0;
-let hyperOffset = 0;
+let hyperOffset = 0; // discrete edit layer index (w)
+let hyperSliceOffset = 0; // continuous scan slice offset (S)
+let scanActive4d = false;
+let keysDown4d = {};
 let player4d = { x: 0, y: 0, z: 0 };
 
 function getAnchorLayerZ4d() {
@@ -62,6 +68,9 @@ function initGrid4d(n) {
     const center = Math.floor(n / 2);
     layerOffset3d = center;
     hyperOffset = center;
+    hyperSliceOffset = hyperOffsetToSlice4d(center);
+    scanActive4d = false;
+    keysDown4d = {};
 
     const start = getStartCell4d();
     player4d = { x: start.x, y: start.y, z: start.z };
@@ -90,8 +99,33 @@ function toggleCell4d(x, y, z, w = hyperOffset) {
     return true;
 }
 
-function canOccupyPlayer4d(x, y, z, w = hyperOffset) {
-    return inBounds4d(x, y, z, w) && getCell4d(x, y, z, w) === 0;
+function getSliceBounds4d() {
+    const max = gridSize4d * SQRT2_4D;
+    return { min: 0.0001, max: max - 0.0001 };
+}
+
+function hyperOffsetToSlice4d(wIndex) {
+    return (wIndex + 0.5) / SQRT2_4D;
+}
+
+function getSliceEquationConstant4d() {
+    return hyperSliceOffset * SQRT2_4D;
+}
+
+function getClosestWForSliceAndX(x, C = getSliceEquationConstant4d()) {
+    const raw = C - (x + 0.5);
+    return clamp4d(Math.round(raw), 0, maxLayerIndex4d());
+}
+
+function canOccupyPlayer4d(x, y, z) {
+    if (scanActive4d) {
+        if (!inBounds4d(x, y, z, 0)) return false;
+        for (let w = 0; w < gridSize4d; w++) {
+            if (getCellSliceSegment4d(x, y, z, w, hyperSliceOffset) && getCell4d(x, y, z, w) === 0) return true;
+        }
+        return false;
+    }
+    return inBounds4d(x, y, z, hyperOffset) && getCell4d(x, y, z, hyperOffset) === 0;
 }
 
 function movePlayer4d(dx, dy, dz) {
@@ -99,7 +133,7 @@ function movePlayer4d(dx, dy, dz) {
     const ny = player4d.y + dy;
     const nz = player4d.z + dz;
 
-    if (!canOccupyPlayer4d(nx, ny, nz, hyperOffset)) return false;
+    if (!canOccupyPlayer4d(nx, ny, nz)) return false;
 
     player4d.x = nx;
     player4d.y = ny;
@@ -107,8 +141,8 @@ function movePlayer4d(dx, dy, dz) {
     return true;
 }
 
-function stabilizePlayerAfterHyperShift() {
-    if (canOccupyPlayer4d(player4d.x, player4d.y, player4d.z, hyperOffset)) return true;
+function stabilizePlayer4d() {
+    if (canOccupyPlayer4d(player4d.x, player4d.y, player4d.z)) return true;
 
     const maxRadius = gridSize4d - 1;
     for (let radius = 1; radius <= maxRadius; radius++) {
@@ -122,7 +156,7 @@ function stabilizePlayerAfterHyperShift() {
                     const y = player4d.y + dy;
                     const z = player4d.z + dz;
 
-                    if (canOccupyPlayer4d(x, y, z, hyperOffset)) {
+                    if (canOccupyPlayer4d(x, y, z)) {
                         player4d = { x, y, z };
                         return true;
                     }
@@ -133,7 +167,47 @@ function stabilizePlayerAfterHyperShift() {
 
     const start = getStartCell4d();
     player4d = { x: start.x, y: start.y, z: start.z };
-    return canOccupyPlayer4d(player4d.x, player4d.y, player4d.z, hyperOffset);
+    return canOccupyPlayer4d(player4d.x, player4d.y, player4d.z);
+}
+
+function getCellSliceSegment4d(x, y, z, w, sliceS = hyperSliceOffset) {
+    const C = sliceS * SQRT2_4D;
+    const xMin = Math.max(x, C - (w + 1));
+    const xMax = Math.min(x + 1, C - w);
+    if (xMin >= xMax) return null;
+
+    return {
+        x0: ((2 * xMin) - C) / SQRT2_4D,
+        x1: ((2 * xMax) - C) / SQRT2_4D,
+        y0: y * SQRT2_4D,
+        y1: (y + 1) * SQRT2_4D,
+        z0: z * SQRT2_4D,
+        z1: (z + 1) * SQRT2_4D
+    };
+}
+
+function updateHyperSliceFromInput4d(dt) {
+    if (!scanActive4d) return false;
+
+    let dir = 0;
+    if (keysDown4d['KeyE']) dir += 1;
+    if (keysDown4d['KeyD']) dir -= 1;
+    if (!dir) return false;
+
+    const bounds = getSliceBounds4d();
+    hyperSliceOffset = clamp4d(hyperSliceOffset + (dir * HYPER_SLICE_SPEED * dt), bounds.min, bounds.max);
+    stabilizePlayer4d();
+    return true;
+}
+
+function setScanActive4d(active) {
+    scanActive4d = !!active;
+    if (scanActive4d) {
+        hyperSliceOffset = hyperOffsetToSlice4d(hyperOffset);
+    } else {
+        hyperOffset = clamp4d(Math.round(hyperSliceOffset * SQRT2_4D - 0.5), 0, maxLayerIndex4d());
+    }
+    stabilizePlayer4d();
 }
 
 function getFlattenFactorForHyperLayer() {
