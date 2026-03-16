@@ -5,6 +5,8 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+    // DOM wiring is intentionally colocated so a future maintainer (human or LLM)
+    // can trace UI element IDs directly to behavior in one pass.
     const gridSlider = document.getElementById('gridSlider');
     const gridVal = document.getElementById('gridVal');
     const layerPrevBtn = document.getElementById('layerPrevBtn');
@@ -23,11 +25,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let rotateKeyHeld = false;
     let lastFrame4d = performance.now();
 
+    // Small helper to keep status-bar updates visually consistent.
+    // We use semantic classes (`neutral`, `info`, `success`, `error`) so styling can
+    // evolve in CSS without touching control logic.
     function setStatus(message, cls = 'neutral') {
         statusBar.className = `status-bar ${cls}`;
         statusBar.textContent = message;
     }
 
+    // Two displays are shown in the UI:
+    // - Layer: integer Z index used in edit mode
+    // - 4D Layer: integer W index in edit mode, or continuous slice offset in scan mode
+    //   (continuous value reflects the scanner's true "between-cells" position)
     function updateLayerDisplays() {
         layerDisplay.textContent = String(layerOffset3d + 1);
         if (scanActive4d) {
@@ -37,6 +46,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Scan mode intentionally locks editing controls.
+    // This avoids ambiguous states where the user modifies voxels while movement logic
+    // is evaluating occupancy from a continuously moving 4D slice.
     function updateUiForMode() {
         const editMode = !scanActive4d;
         layerPrevBtn.disabled = !editMode;
@@ -47,6 +59,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateLayerDisplays();
     }
 
+    // Reset is used both on first load and when grid size changes.
+    // Design choice: reinitialize state deterministically instead of trying to rescale
+    // existing data, because preserving topology across different N values is ambiguous.
     function reset4d(n) {
         initGrid4d(n);
         updateUiForMode();
@@ -55,6 +70,9 @@ document.addEventListener('DOMContentLoaded', () => {
         btnScan.disabled = false;
     }
 
+    // Main animation/update loop.
+    // Only redraw when the scan slice changed to reduce unnecessary canvas work.
+    // dt is clamped to avoid giant time jumps when tab visibility changes.
     function tick4d(ts) {
         const dt = Math.min(0.05, (ts - lastFrame4d) / 1000);
         lastFrame4d = ts;
@@ -74,12 +92,15 @@ document.addEventListener('DOMContentLoaded', () => {
     reset4d(parseInt(gridSlider.value, 10));
     requestAnimationFrame(tick4d);
 
+    // Any grid-size change is treated as creating a fresh puzzle space.
     gridSlider.addEventListener('input', () => {
         const n = parseInt(gridSlider.value, 10);
         gridVal.textContent = String(n);
         reset4d(n);
     });
 
+    // Layer navigation is hard-clamped. We never wrap because physical layer ordering
+    // is meaningful for users reasoning spatially.
     layerPrevBtn.addEventListener('click', () => {
         layerOffset3d = clamp4d(layerOffset3d - 1, 0, maxLayerIndex4d());
         updateLayerDisplays();
@@ -92,6 +113,8 @@ document.addEventListener('DOMContentLoaded', () => {
         drawHyperVolume4d();
     });
 
+    // In edit mode, W is a discrete index. After changing W, we re-stabilize the player
+    // so they are always in a valid empty cell for that layer.
     hyperPrevBtn.addEventListener('click', () => {
         hyperOffset = clamp4d(hyperOffset - 1, 0, maxLayerIndex4d());
         stabilizePlayer4d();
@@ -112,6 +135,9 @@ document.addEventListener('DOMContentLoaded', () => {
         drawHyperVolume4d();
     });
 
+    // Scan toggle bridges the two operating modes:
+    // - edit mode: direct voxel editing on a chosen W layer
+    // - scan mode: continuous x+w slice traversal with movement constraints
     btnScan.addEventListener('click', () => {
         setScanActive4d(!scanActive4d);
         updateUiForMode();
@@ -123,6 +149,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Camera rotation supports either middle-click drag or R+left-drag.
+    // The latter is a convenience for trackpads/mice without middle-click.
     hyperCanvas.addEventListener('mousedown', (e) => {
         const middleDrag = e.button === 1;
         const rDrag = rotateKeyHeld && e.button === 0;
@@ -133,6 +161,9 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
     });
 
+    // Click-to-paint applies only in edit mode.
+    // We pick by projected cube centers (with a radius threshold) for robust UX on
+    // dense scenes where exact polygon hit-testing would be expensive/noisy.
     hyperCanvas.addEventListener('click', (e) => {
         if (isRotating) return;
         if (scanActive4d) {
@@ -156,6 +187,9 @@ document.addEventListener('DOMContentLoaded', () => {
         setStatus(`Toggled cell (${picked.x}, ${picked.y}, ${picked.z}) on 4D layer ${hyperOffset + 1}.`, 'success');
     });
 
+    // Orbit camera around scene center.
+    // Azimuth rotates around vertical axis; elevation is clamped to prevent flipping
+    // through the poles, which keeps controls intuitive.
     window.addEventListener('mousemove', (e) => {
         if (!isRotating) return;
         const dx = e.clientX - lastMouseX;
@@ -173,6 +207,10 @@ document.addEventListener('DOMContentLoaded', () => {
         isRotating = false;
     });
 
+    // Keyboard model notes:
+    // - keysDown4d tracks held keys for continuous hyper-slice motion (E/D)
+    // - movement keys are applied on keydown edge (non-repeat) for grid-step motion
+    // - preventDefault is used where needed to avoid browser scrolling
     window.addEventListener('keydown', (e) => {
         keysDown4d[e.code] = true;
         if (e.code === 'KeyR') {
@@ -183,10 +221,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.repeat) return;
 
         let moved = false;
+        // Axis convention decision:
+        // ArrowUp should feel like positive "forward" in the displayed grid,
+        // so we map it to +Y and ArrowDown to -Y.
+        // (This intentionally reverses the previous mapping that felt inverted.)
         if (e.code === 'ArrowLeft') moved = movePlayer4d(-1, 0, 0);
         else if (e.code === 'ArrowRight') moved = movePlayer4d(1, 0, 0);
-        else if (e.code === 'ArrowUp') moved = movePlayer4d(0, -1, 0);
-        else if (e.code === 'ArrowDown') moved = movePlayer4d(0, 1, 0);
+        else if (e.code === 'ArrowUp') moved = movePlayer4d(0, 1, 0);
+        else if (e.code === 'ArrowDown') moved = movePlayer4d(0, -1, 0);
         else if (e.code === 'KeyW') moved = movePlayer4d(0, 0, 1);
         else if (e.code === 'KeyS') moved = movePlayer4d(0, 0, -1);
         else if (e.code === 'KeyE' || e.code === 'KeyD') {

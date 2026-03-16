@@ -6,8 +6,10 @@
 
 let hyperCtx;
 let hyperCanvas;
+// Camera is simple orbit-style (azimuth/elevation around scene center).
 let cameraAz4d = 45 * Math.PI / 180;
 let cameraEl4d = 30 * Math.PI / 180;
+// Pick buffer stores projected cube centers for nearest-neighbor click selection.
 let pickCells4d = [];
 
 function initRender4d() {
@@ -16,10 +18,15 @@ function initRender4d() {
 }
 
 function project3d(x, y, z, N) {
+    // Lightweight software projection pipeline:
+    // 1) build orbit camera pose from azimuth/elevation
+    // 2) derive camera basis vectors (forward/right/up)
+    // 3) perspective-project onto canvas
     const AZ = cameraAz4d;
     const EL = cameraEl4d;
     const D = N * 3.5;
 
+    // Scene center uses logical grid center so camera behavior is stable when N changes.
     const center = (N - 1) / 2;
     const Cx = center;
     const Cy = center;
@@ -32,6 +39,7 @@ function project3d(x, y, z, N) {
     ];
 
     const fwd = norm3(sub3([Cx, Cy, Cz], eye));
+    // Global up is Z+, yielding a conventional engineering-style coordinate frame.
     const right = norm3(cross3(fwd, [0, 0, 1]));
     const camUp = cross3(right, fwd);
 
@@ -41,6 +49,7 @@ function project3d(x, y, z, N) {
 
     const dir = [x - eye[0], y - eye[1], z - eye[2]];
     const cz = dot3(dir, fwd);
+    // Cull points behind/too-close to camera to avoid projection blowups.
     if (cz < 0.01) return null;
 
     return [
@@ -54,6 +63,7 @@ function drawHyperVolume4d() {
     hyperCtx.clearRect(0, 0, hyperCanvas.width, hyperCanvas.height);
     pickCells4d = [];
 
+    // Rendering path depends on current interaction mode.
     if (scanActive4d) drawScanSlice4d();
     else drawEditLayer4d();
 }
@@ -61,6 +71,8 @@ function drawHyperVolume4d() {
 function drawEditLayer4d() {
     const N = gridSize4d;
     const w = hyperOffset;
+    // Design choice: "flatten" encodes W position by compressing/expanding visible Z
+    // thickness, giving users a visual hint they are moving through hyper-layers.
     const flatten = getFlattenFactorForHyperLayer();
     const zCenter = (N - 1) / 2;
     const thickness = Math.max(0.06, flatten);
@@ -87,6 +99,7 @@ function drawEditLayer4d() {
                 if (corners.some((pt) => pt === null)) continue;
 
                 const depth = corners.reduce((acc, pt) => acc + pt[2], 0) / corners.length;
+                // Store projected center for hit-testing during painting.
                 const centerProj = project3d(x, y, zMapped, N);
                 if (centerProj) pickCells4d.push({ x, y, z, depth, sx: centerProj[0], sy: centerProj[1] });
 
@@ -104,6 +117,7 @@ function drawEditLayer4d() {
         }
     }
 
+    // Painter's algorithm is sufficient for this voxel-like scene.
     cubes.sort((a, b) => b.depth - a.depth);
     cubes.forEach((cube) => drawCube(cube));
 }
@@ -112,6 +126,8 @@ function drawScanSlice4d() {
     const N = gridSize4d;
     const cubes = [];
 
+    // Scan coordinates are in the rotated frame induced by x+w=constant geometry.
+    // We remap back to world-ish coordinates for projection and camera coherence.
     const scanScale = SQRT2_4D;
     const scanCenter = ((N * scanScale) / 2);
     const worldCenter = (N - 1) / 2;
@@ -122,6 +138,7 @@ function drawScanSlice4d() {
         for (let z = 0; z < N; z++) {
             for (let y = 0; y < N; y++) {
                 for (let x = 0; x < N; x++) {
+                    // Null means this hypercube does not intersect current slice.
                     const seg = getCellSliceSegment4d(x, y, z, w, hyperSliceOffset);
                     if (!seg) continue;
 
@@ -148,6 +165,8 @@ function drawScanSlice4d() {
                         toWorld((seg.z0 + seg.z1) * 0.5),
                         N
                     );
+                    // Keep picking tied to current discrete edit layer for predictable
+                    // interactions when users return to edit mode.
                     if (centerProj && w === hyperOffset) {
                         pickCells4d.push({ x, y, z, depth, sx: centerProj[0], sy: centerProj[1] });
                     }
@@ -176,6 +195,7 @@ function drawCube(cube) {
 
     const isInactiveLayer = !cube.isActiveLayer;
 
+    // Color/alpha encodes semantic role (wall/path/start/end/player) and layer activity.
     let baseColor = cube.isWall ? [22, 28, 42] : [95, 145, 235];
     let alpha = cube.isWall ? 0.14 : 0.03;
 
@@ -210,6 +230,7 @@ function drawCube(cube) {
         for (let j = 1; j < face.length; j++) hyperCtx.lineTo(cube.corners[face[j]][0], cube.corners[face[j]][1]);
         hyperCtx.closePath();
 
+        // Per-face shade offset is a cheap depth cue that improves legibility.
         const shade = 0.56 + (i * 0.08);
         hyperCtx.fillStyle = `rgba(${baseColor[0] * shade}, ${baseColor[1] * shade}, ${baseColor[2] * shade}, ${alpha})`;
         hyperCtx.fill();
@@ -229,6 +250,8 @@ function pickCellFromScreen4d(clientX, clientY, targetLayer = null) {
     const sx = (clientX - rect.left) * scaleX;
     const sy = (clientY - rect.top) * scaleY;
 
+    // Fixed pixel threshold intentionally favors "easy clicking" over exactness.
+    // This is important once perspective distortion makes small distant cubes hard to target.
     const threshold = 26;
     let best = null;
 
@@ -239,6 +262,7 @@ function pickCellFromScreen4d(clientX, clientY, targetLayer = null) {
         const dist2 = dx * dx + dy * dy;
         if (dist2 > threshold * threshold) continue;
 
+        // Tie-break by greater depth so front-most candidate wins when centers overlap.
         if (!best || dist2 < best.dist2 - 1e-6 || (Math.abs(dist2 - best.dist2) < 1e-6 && cell.depth > best.depth)) best = { ...cell, dist2 };
     }
 
