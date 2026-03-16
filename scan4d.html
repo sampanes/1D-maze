@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>4D Hyper-Maze Architect</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/game.css">
+  <style>
+    .hyper-controls {
+      background: rgba(0, 0, 0, 0.4);
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(122, 252, 255, 0.2);
+    }
+    .slider-label {
+      display: block;
+      color: #7afcff;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>◆ 4D Hyper-Maze Architect ◆</h1>
+    <p>Visualize a 3D hyper-slice of a 4D grid. The volume shrinks at the hyper-extremes.</p>
+  </div>
+
+  <div class="controls">
+    <div class="control-group">
+      <label for="gridSlider">Grid Size (N)</label>
+      <input id="gridSlider" type="range" min="3" max="10" value="5" step="1" />
+      <span class="val" id="gridVal">5</span>
+    </div>
+
+    <div class="hyper-controls">
+      <label class="slider-label" for="hyperSlider">Hyper-Offset (4th Dimension)</label>
+      <input id="hyperSlider" type="range" min="0" max="8" value="4" step="0.1" style="width: 100%;" />
+      <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #9db1d8;">
+        <span>Start (0)</span>
+        <span id="hyperVal">4.0</span>
+        <span>End (2N-2)</span>
+      </div>
+    </div>
+
+    <button id="btnResetView" style="
+        padding: 8px 16px;
+        background: rgba(122,252,255,0.12);
+        color: #7afcff;
+        border-radius: 999px;
+        border: 1px solid rgba(122,252,255,0.38);
+        font-weight: 700;
+        cursor: pointer;
+      ">Reset Camera</button>
+  </div>
+
+  <div id="statusBar" class="status-bar neutral">
+    Adjust the Hyper-Offset slider to see the 3D volume morph. 
+    MMB or R+Drag to rotate the view.
+  </div>
+
+  <div class="maze-section">
+    <div class="canvas-wrapper">
+      <canvas id="hyperCanvas" width="800" height="600" style="background: #0d1018; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.5);"></canvas>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/globals.js"></script>
+  <script src="js/4d/4d-core.js"></script>
+  <!-- We'll create these next -->
+  <script src="js/4d/render4d.js"></script>
+  <script src="js/4d/init4d.js"></script>
+</body>
+</html>
