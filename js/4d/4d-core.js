@@ -10,8 +10,6 @@ let grid4d = []; // [w][z][y][x]
 let layerOffset3d = 0;
 let hyperOffset = 0;
 let player4d = { x: 0, y: 0, z: 0 };
-let start4d = { x: 0, y: 0, z: 0 };
-let end4d = { x: 0, y: 0, z: 0 };
 
 function maxLayerIndex4d() {
     return gridSize4d - 1;
@@ -34,17 +32,7 @@ function initGrid4d(n) {
     const center = Math.floor(n / 2);
     layerOffset3d = center;
     hyperOffset = center;
-
-    // Extrapolating from 2D/3D conventions: Start/End sit on opposite corners
-    // while sharing one scanner cross-section layer (same z).
-    start4d = { x: 0, y: 0, z: center };
-    end4d = { x: n - 1, y: n - 1, z: center };
-    player4d = { x: start4d.x, y: start4d.y, z: start4d.z };
-
-    for (let w = 0; w < n; w++) {
-        setCell4d(start4d.x, start4d.y, start4d.z, w, 0);
-        setCell4d(end4d.x, end4d.y, end4d.z, w, 0);
-    }
+    player4d = { x: center, y: center, z: center };
 }
 
 function inBounds4d(x, y, z, w = hyperOffset) {
@@ -67,11 +55,6 @@ function toggleCell4d(x, y, z, w = hyperOffset) {
     if (!inBounds4d(x, y, z, w)) return false;
     grid4d[w][z][y][x] = grid4d[w][z][y][x] ? 0 : 1;
     return true;
-}
-
-function isAnchorCell4d(x, y, z) {
-    return (x === start4d.x && y === start4d.y && z === start4d.z)
-        || (x === end4d.x && y === end4d.y && z === end4d.z);
 }
 
 function canOccupyPlayer4d(x, y, z, w = hyperOffset) {
@@ -121,13 +104,8 @@ function stabilizePlayerAfterHyperShift() {
 }
 
 function getFlattenFactorForHyperLayer() {
-    const lowCenter = Math.floor((gridSize4d - 1) / 2);
-    const highCenter = Math.ceil((gridSize4d - 1) / 2);
-    const distToCenter = Math.min(
-        Math.abs(hyperOffset - lowCenter),
-        Math.abs(hyperOffset - highCenter)
-    );
-
-    const maxDist = Math.max(lowCenter, (gridSize4d - 1) - highCenter, 0.0001);
-    return clamp4d(1 - (distToCenter / maxDist), 0, 1);
+    const center = (gridSize4d - 1) / 2;
+    const maxDist = Math.max(center, 0.0001);
+    const dist = Math.abs(hyperOffset - center);
+    return clamp4d(1 - (dist / maxDist), 0, 1);
 }

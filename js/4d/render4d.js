@@ -95,12 +95,8 @@ function drawHyperVolume4d() {
                     corners,
                     depth,
                     isWall,
-                    z,
-                    layerDistance: Math.abs(z - layerOffset3d),
                     isActiveLayer: z === layerOffset3d,
-                    isPlayer: player4d.x === x && player4d.y === y && player4d.z === z,
-                    isStart: start4d.x === x && start4d.y === y && start4d.z === z,
-                    isEnd: end4d.x === x && end4d.y === y && end4d.z === z
+                    isPlayer: player4d.x === x && player4d.y === y && player4d.z === z
                 });
             }
         }
@@ -120,33 +116,17 @@ function drawCube(cube) {
         [4, 5, 6, 7]
     ];
 
-    let baseColor = cube.isWall ? [18, 24, 36] : [95, 145, 235];
-    let alpha = cube.isWall ? 0.18 : 0.05;
-
-    if (cube.layerDistance === 1) {
-        alpha *= 0.65;
-    } else if (cube.layerDistance >= 2) {
-        alpha *= 0.45;
-    }
+    let baseColor = cube.isWall ? [40, 50, 70] : [95, 145, 235];
+    let alpha = cube.isWall ? 0.84 : 0.16;
 
     if (cube.isActiveLayer) {
-        baseColor = cube.isWall ? [28, 36, 52] : [120, 188, 255];
-        alpha = cube.isWall ? 0.94 : 0.34;
-    }
-
-    if (cube.isStart) {
-        baseColor = [93, 255, 176];
-        alpha = cube.isActiveLayer ? 0.9 : 0.55;
-    }
-
-    if (cube.isEnd) {
-        baseColor = [255, 112, 112];
-        alpha = cube.isActiveLayer ? 0.9 : 0.55;
+        baseColor = cube.isWall ? [70, 90, 130] : [115, 180, 255];
+        alpha = cube.isWall ? 0.88 : 0.28;
     }
 
     if (cube.isPlayer) {
         baseColor = [125, 255, 46];
-        alpha = 0.9;
+        alpha = 0.85;
     }
 
     faces.forEach((face, i) => {
@@ -161,19 +141,10 @@ function drawCube(cube) {
         hyperCtx.fillStyle = `rgba(${baseColor[0] * shade}, ${baseColor[1] * shade}, ${baseColor[2] * shade}, ${alpha})`;
         hyperCtx.fill();
 
-        if (cube.isStart) {
-            hyperCtx.strokeStyle = 'rgba(181,255,220,0.98)';
-            hyperCtx.lineWidth = 1.5;
-        } else if (cube.isEnd) {
-            hyperCtx.strokeStyle = 'rgba(255,195,195,0.98)';
-            hyperCtx.lineWidth = 1.5;
-        } else if (cube.isPlayer) {
-            hyperCtx.strokeStyle = 'rgba(220,255,180,0.95)';
-            hyperCtx.lineWidth = 1.5;
-        } else {
-            hyperCtx.strokeStyle = `rgba(255,255,255,${cube.isWall ? 0.2 : 0.08})`;
-            hyperCtx.lineWidth = 1;
-        }
+        hyperCtx.strokeStyle = cube.isPlayer
+            ? 'rgba(220,255,180,0.95)'
+            : `rgba(255,255,255,${cube.isWall ? 0.24 : 0.12})`;
+        hyperCtx.lineWidth = cube.isPlayer ? 1.5 : 1;
         hyperCtx.stroke();
     });
 }
