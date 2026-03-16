@@ -1,107 +1,80 @@
 /**
  * js/4d/4d-core.js
- * Core state/model for 4D maze editor + scanner prototype.
+ *
+ * CORE GEOMETRY AND STATE FOR 4D HYPER-MAZE
  */
 
 let gridSize4d = 5;
-let grid4d = []; // [w][z][y][x], 0 = passable, 1 = wall
+let grid4d = []; // [id][ic][ib][ia]
 
-// Build/edit layer in 3D volume (z axis)
-let layerOffset3d = 2;
+// 3D slice control in the (b, c) plane: C3 = b + c
+let layerOffset3d = 4;
 
-// 4th-d layer selector (w axis)
-let hyperOffset = 2;
-
-// Player (scanner controls): arrows for x/y, W/S for z.
-let player4d = { x: 0, y: 0, z: 0 };
+// 4D slice control in the (a, d) plane: C4 = a + d
+let hyperOffset = 4;
 
 function maxLayerIndex4d() {
-    return gridSize4d - 1;
+    return 2 * gridSize4d - 2;
 }
 
-function clamp4d(v, lo, hi) {
-    return Math.max(lo, Math.min(hi, v));
-}
-
+/**
+ * Initializes a deterministic 4D grid of size N.
+ * Keeps both center slices reasonably traversable while still showing structure.
+ */
 function initGrid4d(n) {
     gridSize4d = n;
     grid4d = [];
 
-    for (let w = 0; w < n; w++) {
-        grid4d[w] = [];
-        for (let z = 0; z < n; z++) {
-            grid4d[w][z] = [];
-            for (let y = 0; y < n; y++) {
-                grid4d[w][z][y] = new Array(n).fill(0);
-            }
-        }
-    }
+    const center = n - 1;
 
-    const center = Math.floor(n / 2);
-    layerOffset3d = center;
-    hyperOffset = center;
-    player4d = { x: 0, y: 0, z: center };
-}
+    for (let id = 0; id < n; id++) {
+        grid4d[id] = [];
+        for (let ic = 0; ic < n; ic++) {
+            grid4d[id][ic] = [];
+            for (let ib = 0; ib < n; ib++) {
+                grid4d[id][ic][ib] = [];
+                for (let ia = 0; ia < n; ia++) {
+                    // Deterministic structured pattern (no random flicker on resize).
+                    const edgeBias = (ia === 0 || ib === 0 || ic === 0 || id === 0 ||
+                        ia === n - 1 || ib === n - 1 || ic === n - 1 || id === n - 1);
+                    const ring = Math.abs((ia + id) - center) + Math.abs((ib + ic) - center);
+                    const patterned = ((ia * 7 + ib * 5 + ic * 3 + id * 11) % 9) < 3;
+                    let isWall = edgeBias && patterned && ring > 1;
 
-function getCell4d(x, y, z, w) {
-    return grid4d[w][z][y][x];
-}
+                    // Keep central crossing corridor open for visual continuity.
+                    const onCrossA = (ia + id) === center;
+                    const onCrossB = (ib + ic) === center;
+                    if (onCrossA || onCrossB) isWall = false;
 
-function setCell4d(x, y, z, w, val) {
-    grid4d[w][z][y][x] = val ? 1 : 0;
-}
-
-function toggleCell4d(x, y, z, w) {
-    grid4d[w][z][y][x] = grid4d[w][z][y][x] ? 0 : 1;
-}
-
-function inBounds4d(x, y, z) {
-    const N = gridSize4d;
-    return x >= 0 && x < N && y >= 0 && y < N && z >= 0 && z < N;
-}
-
-function canOccupyPlayer4d(x, y, z) {
-    if (!inBounds4d(x, y, z)) return false;
-    return getCell4d(x, y, z, hyperOffset) === 0;
-}
-
-function movePlayer4d(dx, dy, dz) {
-    const nx = player4d.x + dx;
-    const ny = player4d.y + dy;
-    const nz = player4d.z + dz;
-    if (!canOccupyPlayer4d(nx, ny, nz)) return false;
-    player4d.x = nx;
-    player4d.y = ny;
-    player4d.z = nz;
-    return true;
-}
-
-function stabilizePlayerAfterHyperShift() {
-    if (canOccupyPlayer4d(player4d.x, player4d.y, player4d.z)) return;
-
-    // Cheap nearest-position stabilization in same local neighborhood.
-    for (let r = 1; r <= gridSize4d; r++) {
-        for (let dz = -r; dz <= r; dz++) {
-            for (let dy = -r; dy <= r; dy++) {
-                for (let dx = -r; dx <= r; dx++) {
-                    const x = player4d.x + dx;
-                    const y = player4d.y + dy;
-                    const z = player4d.z + dz;
-                    if (canOccupyPlayer4d(x, y, z)) {
-                        player4d.x = x;
-                        player4d.y = y;
-                        player4d.z = z;
-                        return;
-                    }
+                    grid4d[id][ic][ib][ia] = isWall ? 1 : 0;
                 }
             }
         }
     }
 }
 
-function getFlattenFactorForHyperLayer() {
-    const center = (gridSize4d - 1) / 2;
-    if (center <= 0) return 1;
-    const dist = Math.abs(hyperOffset - center);
-    return Math.max(0, 1 - dist / center);
+/**
+ * 4D hypercell intersection with both active slice equations.
+ * Returns a 3D prism chunk in scanner space, or null when no intersection.
+ */
+function getCellHyperIntersection(ia, ib, ic, id, c3, c4) {
+    // For C4 = a + d: thickness over a in [ia, ia+1], d in [id, id+1]
+    const aMin = Math.max(ia, c4 - id - 1);
+    const aMax = Math.min(ia + 1, c4 - id);
+    if (aMin >= aMax) return null;
+
+    // For C3 = b + c: thickness over b in [ib, ib+1], c in [ic, ic+1]
+    const bMin = Math.max(ib, c3 - ic - 1);
+    const bMax = Math.min(ib + 1, c3 - ic);
+    if (bMin >= bMax) return null;
+
+    return {
+        x0: 2 * bMin - c3,
+        x1: 2 * bMax - c3,
+        y0: ia,
+        y1: ia + 1,
+        z0: 2 * aMin - c4,
+        z1: 2 * aMax - c4,
+        isWall: grid4d[id][ic][ib][ia] === 1
+    };
 }
