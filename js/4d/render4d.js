@@ -165,7 +165,7 @@ function drawCube(cube) {
     });
 }
 
-function pickCellFromScreen4d(clientX, clientY) {
+function pickCellFromScreen4d(clientX, clientY, targetLayer = null) {
     const rect = hyperCanvas.getBoundingClientRect();
     const scaleX = hyperCanvas.width / rect.width;
     const scaleY = hyperCanvas.height / rect.height;
@@ -176,6 +176,7 @@ function pickCellFromScreen4d(clientX, clientY) {
     let best = null;
 
     for (const cell of pickCells4d) {
+        if (targetLayer !== null && cell.z !== targetLayer) continue;
         const dx = sx - cell.sx;
         const dy = sy - cell.sy;
         const dist2 = dx * dx + dy * dy;

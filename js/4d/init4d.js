@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const hyperPrevBtn = document.getElementById('hyperPrevBtn');
     const hyperNextBtn = document.getElementById('hyperNextBtn');
     const hyperDisplay = document.getElementById('hyperDisplay');
+    const btnScan = document.getElementById('btnScan');
     const btnResetView = document.getElementById('btnResetView');
     const statusBar = document.getElementById('statusBar');
 
@@ -26,11 +27,16 @@ document.addEventListener('DOMContentLoaded', () => {
         hyperDisplay.textContent = String(hyperOffset + 1);
     }
 
+    function updateScanButtonState() {
+        btnScan.disabled = false;
+    }
+
     function reset4d(n) {
         initGrid4d(n);
         updateLayerDisplays();
         setStatus('Click cubes on the active Layer to paint walls. Start/End are opposite corners on the same cross-section. Arrow keys move x/y, W/S move z.');
         drawHyperVolume4d();
+        updateScanButtonState();
     }
 
     initRender4d();
@@ -74,6 +80,10 @@ document.addEventListener('DOMContentLoaded', () => {
         drawHyperVolume4d();
     });
 
+    btnScan.addEventListener('click', () => {
+        setStatus('Scan mode is not wired yet in 4D. This button is a placeholder for upcoming scanner flow.', 'info');
+    });
+
     let isRotating = false;
     let lastMouseX = 0;
     let lastMouseY = 0;
@@ -91,16 +101,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     hyperCanvas.addEventListener('click', (e) => {
         if (isRotating) return;
-        const picked = pickCellFromScreen4d(e.clientX, e.clientY);
+        const picked = pickCellFromScreen4d(e.clientX, e.clientY, layerOffset3d);
         if (!picked) {
             setStatus('No cube selected. Try clicking closer to a visible cube center.', 'info');
             return;
         }
 
-        if (picked.z !== layerOffset3d) {
-            setStatus(`Selected cube is on layer ${picked.z + 1}. Switch Layer to ${picked.z + 1} to edit it.`, 'info');
-            return;
-        }
 
         if (isAnchorCell4d(picked.x, picked.y, picked.z)) {
             setStatus('Start/End anchors are fixed and cannot be painted.', 'info');
