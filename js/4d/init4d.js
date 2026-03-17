@@ -379,8 +379,8 @@ document.addEventListener('DOMContentLoaded', () => {
         drawHyperVolume4d();
         if (scanActive4d) {
             setStatus(
-                'Scan mode: Arrow keys X/Y · W/S: Z · E/D: hyper-slice. ' +
-                `Path shown in gold. Reach the red End.`,
+                'Scan mode: Arrow keys — walk the floor · W/S — climb/descend · E/D — shift hyper-slice. ' +
+                'Path in gold. Reach the red End.',
                 'info'
             );
             showScanHint();

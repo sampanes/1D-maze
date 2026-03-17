@@ -195,13 +195,14 @@ function getCellSliceSegment4d(x, y, z, w, sliceS = hyperSliceOffset) {
 // ── Cross-section geometry ────────────────────────────────────────────────────
 
 function segToWorldBox(seg, N) {
+    // Axis remapping: seg.y → world X, seg.z → world Y, seg.x (diagonal) → world Z (vertical)
     return {
-        x0: seg.x0 / SQRT2_4D + (N - 1) / 2,
-        x1: seg.x1 / SQRT2_4D + (N - 1) / 2,
-        y0: seg.y0 / SQRT2_4D,
-        y1: seg.y1 / SQRT2_4D,
-        z0: seg.z0 / SQRT2_4D,
-        z1: seg.z1 / SQRT2_4D,
+        x0: seg.y0 / SQRT2_4D,
+        x1: seg.y1 / SQRT2_4D,
+        y0: seg.z0 / SQRT2_4D,
+        y1: seg.z1 / SQRT2_4D,
+        z0: seg.x0 / SQRT2_4D + (N - 1) / 2,
+        z1: seg.x1 / SQRT2_4D + (N - 1) / 2,
     };
 }
 
@@ -300,14 +301,13 @@ function canOccupy4d(sx, sy, sz, cs) {
 
 function clampToWorld4d(sx, sy, sz) {
     const N = gridSize4d;
-    // World-X is NOT centred at 0.  At any valid slice S ∈ [0, N√2] a cell (x,w)
-    // can produce wx ∈ [-(N+1)/2, (3N-1)/2].  The old ±halfX clamp was too narrow
-    // on the positive side, making the end cell unreachable for N ≥ 3.
-    // canOccupy4d handles the actual per-box constraint; this just prevents overflow.
+    // With axis remapping: world X = maze-y ∈ [0,N], world Y = maze-z ∈ [0,N],
+    // world Z = diagonal axis ≈ [−0.5, N−0.5].  All three use the same symmetric
+    // tight clamp; canOccupy4d enforces the actual per-box passability constraint.
     return {
-        sx: Math.max(-(N + 1) / 2, Math.min((3 * N - 1) / 2, sx)),
-        sy: Math.max(-0.5,          Math.min(N + 0.5,          sy)),
-        sz: Math.max(-0.5,          Math.min(N + 0.5,          sz)),
+        sx: Math.max(-0.5, Math.min(N + 0.5, sx)),
+        sy: Math.max(-0.5, Math.min(N + 0.5, sy)),
+        sz: Math.max(-1.0, Math.min(N,        sz)),
     };
 }
 

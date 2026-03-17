@@ -63,21 +63,24 @@ function project3d(x, y, z, N) {
     ];
 }
 
-// ── Scan-space → world-space axis conversions (M0.4) ─────────────────────────
+// ── Scan-space → world-space axis conversions ────────────────────────────────
 //
-// getCellSliceSegment4d returns three kinds of coordinates:
-//   scan_x  centred at 0,  width ≈ √2 per cell  → needs offset to match project3d centre
-//   scan_y  origin at 0,   width = √2 per cell   → just divide by √2
-//   scan_z  origin at 0,   width = √2 per cell   → just divide by √2
+// Axis remapping so the diagonal (x+w) dimension is VERTICAL (world Z = up),
+// and the free maze axes y and z form the horizontal FLOOR plane:
 //
-// project3d centres the scene at (N-1)/2 on all three axes, so:
-//   toWorldX(v) = v/√2 + (N-1)/2     (shift centred scan axis to positive range)
-//   toWorldY(v) = v/√2               (y and z already start at 0)
-//   toWorldZ(v) = v/√2
+//   scan_y  (origin-relative, [0, N√2])  → world X  =  v / √2
+//   scan_z  (origin-relative, [0, N√2])  → world Y  =  v / √2
+//   scan_x  (centred at 0)               → world Z  =  v / √2 + (N-1)/2
+//
+// Effect:  at the hyper-slice extremes, scan_x width → 0, so the cross-section
+// collapses to a thin HORIZONTAL SLAB (floor/ceiling).  At the centre diagonal
+// scan_x fills [–(N-1)/√2, (N-1)/√2], giving a full-height 3D volume.
+// Arrow keys (world X/Y) navigate the floor; W/S moves vertically through the
+// diagonal axis; E/D shifts which horizontal floors are visible.
 
-function toWorldX(v, N) { return v / SQRT2_4D + (N - 1) / 2; }
-function toWorldY(v)     { return v / SQRT2_4D; }
-function toWorldZ(v)     { return v / SQRT2_4D; }
+function toWorldX(v)    { return v / SQRT2_4D; }
+function toWorldY(v)    { return v / SQRT2_4D; }
+function toWorldZ(v, N) { return v / SQRT2_4D + (N - 1) / 2; }
 
 // ── Top-level draw dispatch ───────────────────────────────────────────────────
 
@@ -128,9 +131,10 @@ function drawEditLayer4d() {
 
                     const isWall = getCell4d(x, y, z, w) === 1;
 
-                    const wx0 = toWorldX(seg.x0, N), wx1 = toWorldX(seg.x1, N);
-                    const wy0 = toWorldY(seg.y0),    wy1 = toWorldY(seg.y1);
-                    const wz0 = toWorldZ(seg.z0),    wz1 = toWorldZ(seg.z1);
+                    // Axis remapping: y→worldX, z→worldY, diagonal→worldZ (vertical)
+                    const wx0 = toWorldX(seg.y0), wx1 = toWorldX(seg.y1);
+                    const wy0 = toWorldY(seg.z0), wy1 = toWorldY(seg.z1);
+                    const wz0 = toWorldZ(seg.x0, N), wz1 = toWorldZ(seg.x1, N);
 
                     const cornersWorld = [
                         [wx0, wy0, wz0], [wx1, wy0, wz0],
@@ -206,10 +210,10 @@ function drawScanSlice4d() {
 
                     const isWall = getCell4d(x, y, z, w) === 1;
 
-                    // Per-axis world conversions (M0.4 fix).
-                    const wx0 = toWorldX(seg.x0, N), wx1 = toWorldX(seg.x1, N);
-                    const wy0 = toWorldY(seg.y0),    wy1 = toWorldY(seg.y1);
-                    const wz0 = toWorldZ(seg.z0),    wz1 = toWorldZ(seg.z1);
+                    // Axis remapping: y→worldX, z→worldY, diagonal→worldZ (vertical)
+                    const wx0 = toWorldX(seg.y0), wx1 = toWorldX(seg.y1);
+                    const wy0 = toWorldY(seg.z0), wy1 = toWorldY(seg.z1);
+                    const wz0 = toWorldZ(seg.x0, N), wz1 = toWorldZ(seg.x1, N);
 
                     const cornersWorld = [
                         [wx0, wy0, wz0], [wx1, wy0, wz0],
