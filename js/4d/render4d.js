@@ -1,15 +1,26 @@
 /**
  * js/4d/render4d.js
  *
- * 3D renderer for edit-layer view and 4D scan cross-sections.
+ * 3D renderer for the 4D editor and scanner.
+ *
+ * Phase 0 corrections applied:
+ *  - drawEditLayer4d now iterates the active hyperdiagonal (x+w = hyperLayer)
+ *    instead of a flat W-layer.  Ghost cells (off-diagonal) are omitted for
+ *    now; M10.2 will add them.
+ *  - drawScanSlice4d uses per-axis toWorldX/Y/Z instead of a single toWorld
+ *    that incorrectly applied the same transform to the centred scan_x and the
+ *    origin-relative scan_y/scan_z.
+ *  - isStartCell4d / isEndCell4d and pick-buffer now carry the w coordinate.
  */
 
 let hyperCtx;
 let hyperCanvas;
-// Camera is simple orbit-style (azimuth/elevation around scene center).
+
+// Camera — simple orbit (azimuth/elevation) around the scene centre.
 let cameraAz4d = 45 * Math.PI / 180;
 let cameraEl4d = 30 * Math.PI / 180;
-// Pick buffer stores projected cube centers for nearest-neighbor click selection.
+
+// Pick buffer: projected cube centres for nearest-neighbour click selection.
 let pickCells4d = [];
 
 function initRender4d() {
@@ -17,169 +28,210 @@ function initRender4d() {
     hyperCtx = hyperCanvas.getContext('2d');
 }
 
+// ── Perspective projection ────────────────────────────────────────────────────
+
 function project3d(x, y, z, N) {
-    // Lightweight software projection pipeline:
-    // 1) build orbit camera pose from azimuth/elevation
-    // 2) derive camera basis vectors (forward/right/up)
-    // 3) perspective-project onto canvas
     const AZ = cameraAz4d;
     const EL = cameraEl4d;
-    const D = N * 3.5;
+    const D  = N * 3.5;
 
-    // Scene center uses logical grid center so camera behavior is stable when N changes.
     const center = (N - 1) / 2;
-    const Cx = center;
-    const Cy = center;
-    const Cz = center;
+    const Cx = center, Cy = center, Cz = center;
 
     const eye = [
         Cx + D * Math.sin(AZ) * Math.cos(EL),
         Cy - D * Math.cos(AZ) * Math.cos(EL),
-        Cz + D * Math.sin(EL)
+        Cz + D * Math.sin(EL),
     ];
 
-    const fwd = norm3(sub3([Cx, Cy, Cz], eye));
-    // Global up is Z+, yielding a conventional engineering-style coordinate frame.
+    const fwd   = norm3(sub3([Cx, Cy, Cz], eye));
     const right = norm3(cross3(fwd, [0, 0, 1]));
     const camUp = cross3(right, fwd);
 
     const focalLen = (hyperCanvas.width * 0.5) / Math.tan(32 * Math.PI / 180);
-    const screenCx = hyperCanvas.width / 2;
+    const screenCx = hyperCanvas.width  / 2;
     const screenCy = hyperCanvas.height / 2;
 
     const dir = [x - eye[0], y - eye[1], z - eye[2]];
-    const cz = dot3(dir, fwd);
-    // Cull points behind/too-close to camera to avoid projection blowups.
+    const cz  = dot3(dir, fwd);
     if (cz < 0.01) return null;
 
     return [
         screenCx + (dot3(dir, right) / cz) * focalLen,
         screenCy - (dot3(dir, camUp) / cz) * focalLen,
-        cz
+        cz,
     ];
 }
+
+// ── Scan-space → world-space axis conversions (M0.4) ─────────────────────────
+//
+// getCellSliceSegment4d returns three kinds of coordinates:
+//   scan_x  centred at 0,  width ≈ √2 per cell  → needs offset to match project3d centre
+//   scan_y  origin at 0,   width = √2 per cell   → just divide by √2
+//   scan_z  origin at 0,   width = √2 per cell   → just divide by √2
+//
+// project3d centres the scene at (N-1)/2 on all three axes, so:
+//   toWorldX(v) = v/√2 + (N-1)/2     (shift centred scan axis to positive range)
+//   toWorldY(v) = v/√2               (y and z already start at 0)
+//   toWorldZ(v) = v/√2
+
+function toWorldX(v, N) { return v / SQRT2_4D + (N - 1) / 2; }
+function toWorldY(v)     { return v / SQRT2_4D; }
+function toWorldZ(v)     { return v / SQRT2_4D; }
+
+// ── Top-level draw dispatch ───────────────────────────────────────────────────
 
 function drawHyperVolume4d() {
     hyperCtx.clearRect(0, 0, hyperCanvas.width, hyperCanvas.height);
     pickCells4d = [];
-
-    // Rendering path depends on current interaction mode.
     if (scanActive4d) drawScanSlice4d();
-    else drawEditLayer4d();
+    else              drawEditLayer4d();
 }
 
+// ── Edit mode: render the active hyperdiagonal slice ─────────────────────────
+//
+// Only cells where x+w = hyperLayer are drawn (the active 3D cross-section).
+// The cell position in world space is derived from getCellSliceSegment4d at
+// the full-width slice S = hyperLayerToSlice4d(hyperLayer), i.e. C = hyperLayer+1.
+// This gives each cell exactly [x, x+1] in the diagonal axis and
+// [y, y+1] / [z, z+1] in the free axes — a proper unit-size 3D lattice.
+//
+// Ghost rendering of off-diagonal cells is deferred to M10.2.
+
 function drawEditLayer4d() {
-    const N = gridSize4d;
-    const w = hyperOffset;
-    // Design choice: "flatten" encodes W position by compressing/expanding visible Z
-    // thickness, giving users a visual hint they are moving through hyper-layers.
-    const flatten = getFlattenFactorForHyperLayer();
-    const zCenter = (N - 1) / 2;
-    const thickness = Math.max(0.06, flatten);
+    const N  = gridSize4d;
+    const d4 = hyperLayer;
+    // Full-width slice for this diagonal.
+    const S4 = hyperLayerToSlice4d(d4);
+    // Path cells on this diagonal (null when unsolvable or no path crosses here).
+    const pathSet = getBfsPathSetForHyperDiagonal(d4);
 
     const cubes = [];
 
-    for (let z = 0; z < N; z++) {
-        const zMapped = zCenter + (z - zCenter) * flatten;
-        const z0 = zMapped - thickness / 2;
-        const z1 = zMapped + thickness / 2;
+    // Iterate only cells on the active hyperdiagonal.
+    const xMin = Math.max(0, d4 - (N - 1));
+    const xMax = Math.min(N - 1, d4);
 
-        for (let y = 0; y < N; y++) {
-            for (let x = 0; x < N; x++) {
+    for (let x = xMin; x <= xMax; x++) {
+        const w = d4 - x;
+        for (let z = 0; z < N; z++) {
+            for (let y = 0; y < N; y++) {
+                const seg = getCellSliceSegment4d(x, y, z, w, S4);
+                if (!seg) continue; // should not occur at the full-width slice
+
                 const isWall = getCell4d(x, y, z, w) === 1;
 
+                // Convert scan-space box to world-space corners.
+                const wx0 = toWorldX(seg.x0, N), wx1 = toWorldX(seg.x1, N);
+                const wy0 = toWorldY(seg.y0),    wy1 = toWorldY(seg.y1);
+                const wz0 = toWorldZ(seg.z0),    wz1 = toWorldZ(seg.z1);
+
                 const cornersWorld = [
-                    [x - 0.5, y - 0.5, z0], [x + 0.5, y - 0.5, z0],
-                    [x + 0.5, y + 0.5, z0], [x - 0.5, y + 0.5, z0],
-                    [x - 0.5, y - 0.5, z1], [x + 0.5, y - 0.5, z1],
-                    [x + 0.5, y + 0.5, z1], [x - 0.5, y + 0.5, z1]
+                    [wx0, wy0, wz0], [wx1, wy0, wz0],
+                    [wx1, wy1, wz0], [wx0, wy1, wz0],
+                    [wx0, wy0, wz1], [wx1, wy0, wz1],
+                    [wx1, wy1, wz1], [wx0, wy1, wz1],
                 ];
 
-                const corners = cornersWorld.map((pt) => project3d(pt[0], pt[1], pt[2], N));
-                if (corners.some((pt) => pt === null)) continue;
+                const corners = cornersWorld.map(pt => project3d(pt[0], pt[1], pt[2], N));
+                if (corners.some(pt => pt === null)) continue;
 
                 const depth = corners.reduce((acc, pt) => acc + pt[2], 0) / corners.length;
-                // Store projected center for hit-testing during painting.
-                const centerProj = project3d(x, y, zMapped, N);
-                if (centerProj) pickCells4d.push({ x, y, z, depth, sx: centerProj[0], sy: centerProj[1] });
+
+                // All edit-mode cells are on the active diagonal — use centre for pick.
+                const cx = (wx0 + wx1) * 0.5;
+                const cy = (wy0 + wy1) * 0.5;
+                const cz = (wz0 + wz1) * 0.5;
+                const cp = project3d(cx, cy, cz, N);
+                if (cp) pickCells4d.push({ x, y, z, w, depth, sx: cp[0], sy: cp[1] });
+
+                const EPS = 0.0005;
+                const isPlayer = player4d.sx >= wx0 + EPS && player4d.sx <= wx1 - EPS
+                    && player4d.sy >= wy0 + EPS && player4d.sy <= wy1 - EPS
+                    && player4d.sz >= wz0 + EPS && player4d.sz <= wz1 - EPS;
 
                 cubes.push({
                     corners,
                     depth,
                     isWall,
-                    isActiveLayer: z === layerOffset3d,
-                    isPlayer: player4d.x === x && player4d.y === y && player4d.z === z,
-                    isStart: isStartCell4d(x, y, z),
-                    isEnd: isEndCell4d(x, y, z),
-                    mode: 'edit'
+                    isPath:       !!(pathSet && pathSet.has(`${x},${y},${z},${w}`)),
+                    isActiveLayer: true, // all edit cells are on the active diagonal
+                    isPlayer,
+                    isStart:  isStartCell4d(x, y, z, w),
+                    isEnd:    isEndCell4d(x, y, z, w),
+                    mode: 'edit',
                 });
             }
         }
     }
 
-    // Painter's algorithm is sufficient for this voxel-like scene.
     cubes.sort((a, b) => b.depth - a.depth);
-    cubes.forEach((cube) => drawCube(cube));
+    cubes.forEach(cube => drawCube(cube));
 }
+
+// ── Scan mode: render the 4D hyperplane cross-section ────────────────────────
+//
+// Iterates all (w,z,y,x) and shows only cells that intersect the current
+// hyperSliceOffset plane.  World-space mapping uses the per-axis conversions
+// fixed in M0.4 so scan_x (centred) and scan_y/z (origin-relative) land in
+// the correct positions for project3d.
 
 function drawScanSlice4d() {
     const N = gridSize4d;
+    const pathSet = getBfsPathSet4d(); // Set<"x,y,z,w"> or null
     const cubes = [];
-
-    // Scan coordinates are in the rotated frame induced by x+w=constant geometry.
-    // We remap back to world-ish coordinates for projection and camera coherence.
-    const scanScale = SQRT2_4D;
-    const scanCenter = ((N * scanScale) / 2);
-    const worldCenter = (N - 1) / 2;
-
-    const toWorld = (v) => ((v - scanCenter) / scanScale) + worldCenter;
 
     for (let w = 0; w < N; w++) {
         for (let z = 0; z < N; z++) {
             for (let y = 0; y < N; y++) {
                 for (let x = 0; x < N; x++) {
-                    // Null means this hypercube does not intersect current slice.
                     const seg = getCellSliceSegment4d(x, y, z, w, hyperSliceOffset);
                     if (!seg) continue;
 
                     const isWall = getCell4d(x, y, z, w) === 1;
+
+                    // Per-axis world conversions (M0.4 fix).
+                    const wx0 = toWorldX(seg.x0, N), wx1 = toWorldX(seg.x1, N);
+                    const wy0 = toWorldY(seg.y0),    wy1 = toWorldY(seg.y1);
+                    const wz0 = toWorldZ(seg.z0),    wz1 = toWorldZ(seg.z1);
+
                     const cornersWorld = [
-                        [toWorld(seg.x0), toWorld(seg.y0), toWorld(seg.z0)],
-                        [toWorld(seg.x1), toWorld(seg.y0), toWorld(seg.z0)],
-                        [toWorld(seg.x1), toWorld(seg.y1), toWorld(seg.z0)],
-                        [toWorld(seg.x0), toWorld(seg.y1), toWorld(seg.z0)],
-                        [toWorld(seg.x0), toWorld(seg.y0), toWorld(seg.z1)],
-                        [toWorld(seg.x1), toWorld(seg.y0), toWorld(seg.z1)],
-                        [toWorld(seg.x1), toWorld(seg.y1), toWorld(seg.z1)],
-                        [toWorld(seg.x0), toWorld(seg.y1), toWorld(seg.z1)]
+                        [wx0, wy0, wz0], [wx1, wy0, wz0],
+                        [wx1, wy1, wz0], [wx0, wy1, wz0],
+                        [wx0, wy0, wz1], [wx1, wy0, wz1],
+                        [wx1, wy1, wz1], [wx0, wy1, wz1],
                     ];
 
-                    const corners = cornersWorld.map((pt) => project3d(pt[0], pt[1], pt[2], N));
-                    if (corners.some((pt) => pt === null)) continue;
+                    const corners = cornersWorld.map(pt => project3d(pt[0], pt[1], pt[2], N));
+                    if (corners.some(pt => pt === null)) continue;
 
                     const depth = corners.reduce((acc, pt) => acc + pt[2], 0) / corners.length;
 
-                    const centerProj = project3d(
-                        toWorld((seg.x0 + seg.x1) * 0.5),
-                        toWorld((seg.y0 + seg.y1) * 0.5),
-                        toWorld((seg.z0 + seg.z1) * 0.5),
-                        N
-                    );
-                    // Keep picking tied to current discrete edit layer for predictable
-                    // interactions when users return to edit mode.
-                    if (centerProj && w === hyperOffset) {
-                        pickCells4d.push({ x, y, z, depth, sx: centerProj[0], sy: centerProj[1] });
+                    // Pick buffer follows the active hyperdiagonal so returning to edit
+                    // mode lands on a meaningful layer.
+                    if ((x + w) === hyperLayer) {
+                        const cx = (wx0 + wx1) * 0.5;
+                        const cy = (wy0 + wy1) * 0.5;
+                        const cz = (wz0 + wz1) * 0.5;
+                        const cp = project3d(cx, cy, cz, N);
+                        if (cp) pickCells4d.push({ x, y, z, w, depth, sx: cp[0], sy: cp[1] });
                     }
+
+                    const EPS2 = 0.0005;
+                    const isPlayerScan = player4d.sx >= wx0 + EPS2 && player4d.sx <= wx1 - EPS2
+                        && player4d.sy >= wy0 + EPS2 && player4d.sy <= wy1 - EPS2
+                        && player4d.sz >= wz0 + EPS2 && player4d.sz <= wz1 - EPS2;
 
                     cubes.push({
                         corners,
                         depth,
                         isWall,
-                        isActiveLayer: w === hyperOffset,
-                        isPlayer: player4d.x === x && player4d.y === y && player4d.z === z,
-                        isStart: isStartCell4d(x, y, z),
-                        isEnd: isEndCell4d(x, y, z),
-                        mode: 'scan'
+                        isPath:       !!(pathSet && pathSet.has(`${x},${y},${z},${w}`)),
+                        isActiveLayer: (x + w) === hyperLayer,
+                        isPlayer: isPlayerScan,
+                        isStart:  isStartCell4d(x, y, z, w),
+                        isEnd:    isEndCell4d(x, y, z, w),
+                        mode: 'scan',
                     });
                 }
             }
@@ -187,26 +239,41 @@ function drawScanSlice4d() {
     }
 
     cubes.sort((a, b) => b.depth - a.depth);
-    cubes.forEach((cube) => drawCube(cube));
+    cubes.forEach(cube => drawCube(cube));
 }
 
+// ── Cube face renderer ────────────────────────────────────────────────────────
+
 function drawCube(cube) {
-    const faces = [[0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7], [0, 1, 2, 3], [4, 5, 6, 7]];
+    const faces = [
+        [0, 1, 5, 4], [1, 2, 6, 5],
+        [2, 3, 7, 6], [3, 0, 4, 7],
+        [0, 1, 2, 3], [4, 5, 6, 7],
+    ];
 
-    const isInactiveLayer = !cube.isActiveLayer;
+    const isInactive = !cube.isActiveLayer;
 
-    // Color/alpha encodes semantic role (wall/path/start/end/player) and layer activity.
+    // Base colour and alpha encode semantic role and layer activity.
     let baseColor = cube.isWall ? [22, 28, 42] : [95, 145, 235];
-    let alpha = cube.isWall ? 0.14 : 0.03;
+    let alpha     = cube.isWall ? 0.14 : 0.03;
 
     if (cube.isActiveLayer) {
         baseColor = cube.isWall ? [12, 16, 28] : [115, 180, 255];
-        alpha = cube.isWall ? 0.94 : 0.34;
+        alpha     = cube.isWall ? 0.94 : 0.34;
     }
 
     if (cube.mode === 'scan') {
         alpha = cube.isWall ? 0.84 : 0.07;
-        if (isInactiveLayer) alpha *= 0.68;
+        if (isInactive) alpha *= 0.68;
+    }
+
+    // Path highlight (gold) overrides the default passable colour.
+    // isStart/isEnd checks below still take precedence over path colouring.
+    if (cube.isPath && !cube.isWall) {
+        baseColor = [255, 216, 79]; // #ffd84f — matches 3D's path gold
+        alpha = cube.mode === 'scan'
+            ? (cube.isActiveLayer ? 0.82 : 0.22)
+            : 0.85;
     }
 
     if (cube.isStart) {
@@ -227,53 +294,55 @@ function drawCube(cube) {
     faces.forEach((face, i) => {
         hyperCtx.beginPath();
         hyperCtx.moveTo(cube.corners[face[0]][0], cube.corners[face[0]][1]);
-        for (let j = 1; j < face.length; j++) hyperCtx.lineTo(cube.corners[face[j]][0], cube.corners[face[j]][1]);
+        for (let j = 1; j < face.length; j++) {
+            hyperCtx.lineTo(cube.corners[face[j]][0], cube.corners[face[j]][1]);
+        }
         hyperCtx.closePath();
 
-        // Per-face shade offset is a cheap depth cue that improves legibility.
-        const shade = 0.56 + (i * 0.08);
-        hyperCtx.fillStyle = `rgba(${baseColor[0] * shade}, ${baseColor[1] * shade}, ${baseColor[2] * shade}, ${alpha})`;
+        const shade = 0.56 + i * 0.08;
+        hyperCtx.fillStyle = `rgba(${Math.round(baseColor[0]*shade)},${Math.round(baseColor[1]*shade)},${Math.round(baseColor[2]*shade)},${alpha})`;
         hyperCtx.fill();
 
         hyperCtx.strokeStyle = cube.isPlayer
             ? 'rgba(220,255,180,0.95)'
-            : `rgba(255,255,255,${isInactiveLayer ? 0.03 : (cube.isWall ? 0.22 : 0.11)})`;
-        hyperCtx.lineWidth = cube.isPlayer ? 1.5 : (isInactiveLayer ? 0.6 : 1);
+            : `rgba(255,255,255,${isInactive ? 0.03 : (cube.isWall ? 0.22 : 0.11)})`;
+        hyperCtx.lineWidth = cube.isPlayer ? 1.5 : (isInactive ? 0.6 : 1);
         hyperCtx.stroke();
     });
 }
 
-function pickCellFromScreen4d(clientX, clientY, targetLayer = null) {
-    const rect = hyperCanvas.getBoundingClientRect();
-    const scaleX = hyperCanvas.width / rect.width;
+// ── Click / pick ──────────────────────────────────────────────────────────────
+
+function pickCellFromScreen4d(clientX, clientY) {
+    const rect   = hyperCanvas.getBoundingClientRect();
+    const scaleX = hyperCanvas.width  / rect.width;
     const scaleY = hyperCanvas.height / rect.height;
     const sx = (clientX - rect.left) * scaleX;
-    const sy = (clientY - rect.top) * scaleY;
+    const sy = (clientY - rect.top)  * scaleY;
 
-    // Fixed pixel threshold intentionally favors "easy clicking" over exactness.
-    // This is important once perspective distortion makes small distant cubes hard to target.
     const threshold = 26;
     let best = null;
 
     for (const cell of pickCells4d) {
-        if (targetLayer !== null && cell.z !== targetLayer) continue;
         const dx = sx - cell.sx;
         const dy = sy - cell.sy;
         const dist2 = dx * dx + dy * dy;
         if (dist2 > threshold * threshold) continue;
-
-        // Tie-break by greater depth so front-most candidate wins when centers overlap.
-        if (!best || dist2 < best.dist2 - 1e-6 || (Math.abs(dist2 - best.dist2) < 1e-6 && cell.depth > best.depth)) best = { ...cell, dist2 };
+        if (!best
+            || dist2 < best.dist2 - 1e-6
+            || (Math.abs(dist2 - best.dist2) < 1e-6 && cell.depth > best.depth)) {
+            best = { ...cell, dist2 };
+        }
     }
 
     if (!best) return null;
-    return { x: best.x, y: best.y, z: best.z };
+    // Return all four coordinates so callers can pass w to toggleCell4d / isAnchorCell4d.
+    return { x: best.x, y: best.y, z: best.z, w: best.w };
 }
 
-function norm3(v) {
-    const l = Math.hypot(v[0], v[1], v[2]);
-    return [v[0] / l, v[1] / l, v[2] / l];
-}
-function sub3(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
-function cross3(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
-function dot3(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+// ── Vector math helpers ───────────────────────────────────────────────────────
+
+function norm3(v)    { const l = Math.hypot(v[0], v[1], v[2]); return [v[0]/l, v[1]/l, v[2]/l]; }
+function sub3(a, b)  { return [a[0]-b[0], a[1]-b[1], a[2]-b[2]]; }
+function cross3(a,b) { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+function dot3(a, b)  { return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]; }

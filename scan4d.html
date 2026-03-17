@@ -37,20 +37,33 @@
     </div>
 
     <div class="control-group">
-      <label>Layer</label>
+      <label>Layer (x+w)</label>
       <button id="layerPrevBtn" class="layer-nav-btn">◀</button>
-      <span id="layerDisplay" class="val">0</span>
+      <span id="layerDisplay" class="val">5</span>
       <button id="layerNextBtn" class="layer-nav-btn">▶</button>
     </div>
 
-    <div class="control-group">
-      <label>4D Layer</label>
-      <button id="hyperPrevBtn" class="layer-nav-btn">◀</button>
-      <span id="hyperDisplay" class="val">0</span>
-      <button id="hyperNextBtn" class="layer-nav-btn">▶</button>
-    </div>
-
     <button id="btnScan" class="btn-scan" disabled>Start Scan</button>
+
+    <button id="btnValidate" style="
+        padding: 8px 16px;
+        background: rgba(122,252,255,0.12);
+        color: #7afcff;
+        border-radius: 999px;
+        border: 1px solid rgba(122,252,255,0.38);
+        font-weight: 700;
+        cursor: pointer;
+      ">Validate</button>
+
+    <button id="btnWipe" title="Clear active layer · Shift+click to clear all" style="
+        padding: 8px 16px;
+        background: rgba(255,106,106,0.12);
+        color: #ff6a6a;
+        border-radius: 999px;
+        border: 1px solid rgba(255,106,106,0.38);
+        font-weight: 700;
+        cursor: pointer;
+      ">Wipe Layer</button>
 
     <button id="btnResetView" style="
         padding: 8px 16px;
@@ -64,7 +77,7 @@
   </div>
 
   <div id="statusBar" class="status-bar neutral">
-    Edit mode: paint cubes on the selected layer. Scan mode: Arrow keys move x/y, W/S move z, and E/D smoothly shift the hyper-slice through the hidden dimension.
+    Edit: click a cube to toggle wall. Layer ◀▶ moves through hyperdiagonals (x+w = const). Centre layer holds Start and End.
   </div>
 
   <div class="maze-section">
@@ -74,6 +87,7 @@
   </div>
 
   <!-- Scripts -->
+  <script src="js/audio.js"></script>
   <script src="js/4d/4d-core.js"></script>
   <script src="js/4d/render4d.js"></script>
   <script src="js/4d/init4d.js"></script>

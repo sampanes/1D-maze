@@ -1,133 +1,219 @@
 /**
  * js/4d/init4d.js
  *
- * Entry point and controls for the 4D editor/scanner.
+ * Entry point, UI wiring, and game loop for the 4D editor/scanner.
+ *
+ * Phase 0: hyperLayer diagonal convention, toWorld fix, anchor coords.
+ * Phase 1: BFS gate, auto-validate on paint, Validate button, Wipe button,
+ *          path highlighting (delegated to render4d.js + 4d-core.js).
+ * Phase 2: Continuous player physics, buildCrossSection4d, swept movement.
+ * Phase 3: Phase transitions, win detection.
+ * Phase 4: Audio wiring.
  */
 
+// Module-level hook so 4d-core.js can call setStatus without DOM coupling.
+let statusBar4d;
+function setStatus4d(message, cls = 'neutral') {
+    if (statusBar4d) {
+        statusBar4d.className = `status-bar ${cls}`;
+        statusBar4d.textContent = message;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-    // DOM wiring is intentionally colocated so a future maintainer (human or LLM)
-    // can trace UI element IDs directly to behavior in one pass.
-    const gridSlider = document.getElementById('gridSlider');
-    const gridVal = document.getElementById('gridVal');
+
+    // ── DOM refs ──────────────────────────────────────────────────────────────
+
+    const gridSlider   = document.getElementById('gridSlider');
+    const gridVal      = document.getElementById('gridVal');
     const layerPrevBtn = document.getElementById('layerPrevBtn');
     const layerNextBtn = document.getElementById('layerNextBtn');
     const layerDisplay = document.getElementById('layerDisplay');
-    const hyperPrevBtn = document.getElementById('hyperPrevBtn');
-    const hyperNextBtn = document.getElementById('hyperNextBtn');
-    const hyperDisplay = document.getElementById('hyperDisplay');
-    const btnScan = document.getElementById('btnScan');
+    const btnScan      = document.getElementById('btnScan');
+    const btnValidate  = document.getElementById('btnValidate');
+    const btnWipe      = document.getElementById('btnWipe');
     const btnResetView = document.getElementById('btnResetView');
-    const statusBar = document.getElementById('statusBar');
+    const statusBar    = document.getElementById('statusBar');
 
-    let isRotating = false;
-    let lastMouseX = 0;
-    let lastMouseY = 0;
+    // Wire the module-level setStatus4d to the actual DOM element.
+    statusBar4d = statusBar;
+
+    // ── Rotate-drag state ─────────────────────────────────────────────────────
+
+    let isRotating    = false;
+    let lastMouseX    = 0;
+    let lastMouseY    = 0;
     let rotateKeyHeld = false;
-    let lastFrame4d = performance.now();
+    let lastFrame4d   = performance.now();
 
-    // Small helper to keep status-bar updates visually consistent.
-    // We use semantic classes (`neutral`, `info`, `success`, `error`) so styling can
-    // evolve in CSS without touching control logic.
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
     function setStatus(message, cls = 'neutral') {
-        statusBar.className = `status-bar ${cls}`;
-        statusBar.textContent = message;
+        setStatus4d(message, cls);
     }
 
-    // Two displays are shown in the UI:
-    // - Layer: integer Z index used in edit mode
-    // - 4D Layer: integer W index in edit mode, or continuous slice offset in scan mode
-    //   (continuous value reflects the scanner's true "between-cells" position)
+    // Edit mode:  hyperLayer + 1  (centre diagonal N-1 → "Layer N").
+    // Scan mode:  continuous hyperSliceOffset to two decimal places.
     function updateLayerDisplays() {
-        layerDisplay.textContent = String(layerOffset3d + 1);
-        if (scanActive4d) {
-            hyperDisplay.textContent = hyperSliceOffset.toFixed(2);
-        } else {
-            hyperDisplay.textContent = String(hyperOffset + 1);
-        }
+        layerDisplay.textContent = scanActive4d
+            ? hyperSliceOffset.toFixed(2)
+            : String(hyperLayer + 1);
     }
 
-    // Scan mode intentionally locks editing controls.
-    // This avoids ambiguous states where the user modifies voxels while movement logic
-    // is evaluating occupancy from a continuously moving 4D slice.
     function updateUiForMode() {
-        const editMode = !scanActive4d;
-        layerPrevBtn.disabled = !editMode;
-        layerNextBtn.disabled = !editMode;
-        hyperPrevBtn.disabled = !editMode;
-        hyperNextBtn.disabled = !editMode;
-        btnScan.textContent = scanActive4d ? 'Stop Scan' : 'Start Scan';
+        const edit = !scanActive4d;
+        layerPrevBtn.disabled = !edit;
+        layerNextBtn.disabled = !edit;
+        gridSlider.disabled   = !edit;
+        btnValidate.disabled  = !edit;
+        btnWipe.disabled      = !edit;
+        btnScan.textContent   = scanActive4d ? 'Stop Scan' : 'Start Scan';
         updateLayerDisplays();
     }
 
-    // Reset is used both on first load and when grid size changes.
-    // Design choice: reinitialize state deterministically instead of trying to rescale
-    // existing data, because preserving topology across different N values is ambiguous.
-    function reset4d(n) {
-        initGrid4d(n);
-        updateUiForMode();
-        setStatus('Edit mode: click cubes on the active Layer to paint walls. Start/End are opposite corners on the same cross-section.', 'neutral');
-        drawHyperVolume4d();
-        btnScan.disabled = false;
+    // ── BFS helpers ───────────────────────────────────────────────────────────
+
+    // Run BFS, update btnScan, return whether solvable.
+    // Called after every grid edit so the Scan button is always in sync.
+    function runBfs() {
+        bfs4d();
+        btnScan.disabled = !solvable4d;
+        return solvable4d;
     }
 
-    // Main animation/update loop.
-    // Only redraw when the scan slice changed to reduce unnecessary canvas work.
-    // dt is clamped to avoid giant time jumps when tab visibility changes.
+    // ── Reset / initialise ────────────────────────────────────────────────────
+
+    function reset4d(n) {
+        initGrid4d(n);
+        // Empty grid is always solvable; run BFS to populate bfsPath4d.
+        runBfs();
+        updateUiForMode();
+        setStatus(
+            `Edit: click a cube to toggle wall. Layer ◀▶ moves through hyperdiagonals (x+w). ` +
+            `Centre = Layer ${n} (Start & End live here). Validate to check solvability.`,
+            'neutral'
+        );
+        drawHyperVolume4d();
+    }
+
+    // ── Game loop ─────────────────────────────────────────────────────────────
+
     function tick4d(ts) {
         const dt = Math.min(0.05, (ts - lastFrame4d) / 1000);
         lastFrame4d = ts;
 
-        let needsRedraw = false;
-        if (updateHyperSliceFromInput4d(dt)) needsRedraw = true;
-
-        if (needsRedraw) {
+        if (scanActive4d) {
+            updateHyperSliceFromInput4d(dt);
+            const cs = buildCrossSection4d(hyperSliceOffset);
+            updatePlayer4d(dt, cs);
             updateLayerDisplays();
             drawHyperVolume4d();
+
+            if (playerHitsEnd4d(cs)) {
+                if (typeof playCelebrate === 'function') playCelebrate();
+                setScanActive4d(false);
+                updateUiForMode();
+                drawHyperVolume4d();
+                setStatus('Scan complete — reached the End!', 'success');
+            }
         }
 
         requestAnimationFrame(tick4d);
     }
 
+    // ── Startup ───────────────────────────────────────────────────────────────
+
     initRender4d();
     reset4d(parseInt(gridSlider.value, 10));
     requestAnimationFrame(tick4d);
 
-    // Any grid-size change is treated as creating a fresh puzzle space.
+    // ── Grid size slider ──────────────────────────────────────────────────────
+
     gridSlider.addEventListener('input', () => {
         const n = parseInt(gridSlider.value, 10);
         gridVal.textContent = String(n);
         reset4d(n);
     });
 
-    // Layer navigation is hard-clamped. We never wrap because physical layer ordering
-    // is meaningful for users reasoning spatially.
+    // ── Layer navigation ──────────────────────────────────────────────────────
+    // Controls hyperLayer (diagonal x+w), range 0..2*(N-1).
+
     layerPrevBtn.addEventListener('click', () => {
-        layerOffset3d = clamp4d(layerOffset3d - 1, 0, maxLayerIndex4d());
+        hyperLayer = clamp4d(hyperLayer - 1, 0, maxHyperLayerIndex4d());
+        hyperSliceOffset = hyperLayerToSlice4d(hyperLayer);
+        stabilizePlayer4d();
         updateLayerDisplays();
         drawHyperVolume4d();
     });
 
     layerNextBtn.addEventListener('click', () => {
-        layerOffset3d = clamp4d(layerOffset3d + 1, 0, maxLayerIndex4d());
-        updateLayerDisplays();
-        drawHyperVolume4d();
-    });
-
-    // In edit mode, W is a discrete index. After changing W, we re-stabilize the player
-    // so they are always in a valid empty cell for that layer.
-    hyperPrevBtn.addEventListener('click', () => {
-        hyperOffset = clamp4d(hyperOffset - 1, 0, maxLayerIndex4d());
+        hyperLayer = clamp4d(hyperLayer + 1, 0, maxHyperLayerIndex4d());
+        hyperSliceOffset = hyperLayerToSlice4d(hyperLayer);
         stabilizePlayer4d();
         updateLayerDisplays();
         drawHyperVolume4d();
     });
 
-    hyperNextBtn.addEventListener('click', () => {
-        hyperOffset = clamp4d(hyperOffset + 1, 0, maxLayerIndex4d());
-        stabilizePlayer4d();
-        updateLayerDisplays();
-        drawHyperVolume4d();
+    // ── Validate ──────────────────────────────────────────────────────────────
+
+    btnValidate.addEventListener('click', () => {
+        const path = bfs4d();
+        btnScan.disabled = !solvable4d;
+        if (path) {
+            setStatus(`Path found — ${path.length} cells. Ready to Start Scan.`, 'success');
+        } else {
+            setStatus('No path — connect Start (green) to End (red) through passable cells.', 'error');
+        }
+        drawHyperVolume4d(); // redraws with updated path highlight
     });
+
+    // ── Wipe ─────────────────────────────────────────────────────────────────
+    // Plain click: clear the active hyperdiagonal (x+w = hyperLayer).
+    // Shift+click: clear the entire 4D grid.
+    // Anchors are always restored to passable.
+
+    btnWipe.addEventListener('click', (e) => {
+        const N = gridSize4d;
+
+        if (e.shiftKey) {
+            for (let w = 0; w < N; w++) {
+                for (let z = 0; z < N; z++) {
+                    for (let y = 0; y < N; y++) {
+                        grid4d[w][z][y].fill(0);
+                    }
+                }
+            }
+        } else {
+            // Clear only cells on the active hyperdiagonal.
+            const d4   = hyperLayer;
+            const xMin = Math.max(0, d4 - (N - 1));
+            const xMax = Math.min(N - 1, d4);
+            for (let x = xMin; x <= xMax; x++) {
+                const w = d4 - x;
+                for (let z = 0; z < N; z++) {
+                    for (let y = 0; y < N; y++) {
+                        grid4d[w][z][y][x] = 0;
+                    }
+                }
+            }
+        }
+
+        // Always restore anchors.
+        grid4d[N - 1][0][0][0]         = 0; // Start
+        grid4d[0][N - 1][N - 1][N - 1] = 0; // End
+
+        runBfs();
+        stabilizePlayer4d();
+        drawHyperVolume4d();
+        setStatus(
+            e.shiftKey
+                ? 'Entire 4D grid cleared. Path is open.'
+                : `Layer ${hyperLayer + 1} cleared (hyperdiagonal x+w=${hyperLayer}).`,
+            'neutral'
+        );
+    });
+
+    // ── Reset camera ──────────────────────────────────────────────────────────
 
     btnResetView.addEventListener('click', () => {
         cameraAz4d = 45 * Math.PI / 180;
@@ -135,25 +221,71 @@ document.addEventListener('DOMContentLoaded', () => {
         drawHyperVolume4d();
     });
 
-    // Scan toggle bridges the two operating modes:
-    // - edit mode: direct voxel editing on a chosen W layer
-    // - scan mode: continuous x+w slice traversal with movement constraints
+    // ── Scan toggle ───────────────────────────────────────────────────────────
+
     btnScan.addEventListener('click', () => {
+        if (!scanActive4d && !solvable4d) return; // gate (belt-and-suspenders)
         setScanActive4d(!scanActive4d);
         updateUiForMode();
         drawHyperVolume4d();
         if (scanActive4d) {
-            setStatus('Scan mode: Arrow keys move x/y, W/S move z, and E/D smoothly shift the hyper-slice through 4D.', 'info');
+            setStatus(
+                'Scan mode: Arrow keys X/Y · W/S: Z · E/D: hyper-slice. ' +
+                `Path shown in gold. Reach the red End.`,
+                'info'
+            );
         } else {
-            setStatus('Returned to edit mode. Layer controls and painting are enabled again.', 'neutral');
+            setStatus('Returned to edit mode.', 'neutral');
         }
     });
 
-    // Camera rotation supports either middle-click drag or R+left-drag.
-    // The latter is a convenience for trackpads/mice without middle-click.
+    // ── Click-to-paint ────────────────────────────────────────────────────────
+
+    hyperCanvas.addEventListener('click', (e) => {
+        if (isRotating) return;
+
+        if (scanActive4d) {
+            setStatus('Painting is disabled in scan mode. Stop scan to edit.', 'info');
+            return;
+        }
+
+        const picked = pickCellFromScreen4d(e.clientX, e.clientY);
+        if (!picked) {
+            setStatus('No cube selected — click closer to a cube centre.', 'info');
+            return;
+        }
+
+        if (isAnchorCell4d(picked.x, picked.y, picked.z, picked.w)) {
+            setStatus('Start/End anchors cannot be painted.', 'info');
+            return;
+        }
+
+        toggleCell4d(picked.x, picked.y, picked.z, picked.w);
+        stabilizePlayer4d();
+
+        // Auto-validate so the Scan button stays in sync with every edit.
+        const nowSolvable = runBfs();
+        drawHyperVolume4d();
+
+        const cell = `(x=${picked.x}, y=${picked.y}, z=${picked.z}, w=${picked.w})`;
+        if (nowSolvable) {
+            setStatus(
+                `Toggled ${cell} — path still open (${bfsPath4d.length} cells).`,
+                'success'
+            );
+        } else {
+            setStatus(
+                `Toggled ${cell} — no path to End yet.`,
+                'info'
+            );
+        }
+    });
+
+    // ── Camera orbit (middle-click or R + left-drag) ──────────────────────────
+
     hyperCanvas.addEventListener('mousedown', (e) => {
         const middleDrag = e.button === 1;
-        const rDrag = rotateKeyHeld && e.button === 0;
+        const rDrag      = rotateKeyHeld && e.button === 0;
         if (!middleDrag && !rDrag) return;
         isRotating = true;
         lastMouseX = e.clientX;
@@ -161,91 +293,34 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
     });
 
-    // Click-to-paint applies only in edit mode.
-    // We pick by projected cube centers (with a radius threshold) for robust UX on
-    // dense scenes where exact polygon hit-testing would be expensive/noisy.
-    hyperCanvas.addEventListener('click', (e) => {
-        if (isRotating) return;
-        if (scanActive4d) {
-            setStatus('Painting is disabled during scan mode. Stop scan to edit cells.', 'info');
-            return;
-        }
-
-        const picked = pickCellFromScreen4d(e.clientX, e.clientY, layerOffset3d);
-        if (!picked) {
-            setStatus('No cube selected. Try clicking closer to a visible cube center.', 'info');
-            return;
-        }
-
-        if (isAnchorCell4d(picked.x, picked.y, picked.z)) {
-            setStatus('Start/End anchors are fixed and cannot be painted.', 'info');
-            return;
-        }
-        toggleCell4d(picked.x, picked.y, picked.z, hyperOffset);
-        stabilizePlayer4d();
-        drawHyperVolume4d();
-        setStatus(`Toggled cell (${picked.x}, ${picked.y}, ${picked.z}) on 4D layer ${hyperOffset + 1}.`, 'success');
-    });
-
-    // Orbit camera around scene center.
-    // Azimuth rotates around vertical axis; elevation is clamped to prevent flipping
-    // through the poles, which keeps controls intuitive.
     window.addEventListener('mousemove', (e) => {
         if (!isRotating) return;
         const dx = e.clientX - lastMouseX;
         const dy = e.clientY - lastMouseY;
-
         cameraAz4d -= dx * 0.01;
         cameraEl4d = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraEl4d + dy * 0.01));
-
         lastMouseX = e.clientX;
         lastMouseY = e.clientY;
         drawHyperVolume4d();
     });
 
-    window.addEventListener('mouseup', () => {
-        isRotating = false;
-    });
+    window.addEventListener('mouseup', () => { isRotating = false; });
 
-    // Keyboard model notes:
-    // - keysDown4d tracks held keys for continuous hyper-slice motion (E/D)
-    // - movement keys are applied on keydown edge (non-repeat) for grid-step motion
-    // - preventDefault is used where needed to avoid browser scrolling
+    // ── Keyboard ──────────────────────────────────────────────────────────────
+
     window.addEventListener('keydown', (e) => {
         keysDown4d[e.code] = true;
-        if (e.code === 'KeyR') {
-            rotateKeyHeld = true;
-            return;
-        }
 
-        if (e.repeat) return;
+        if (e.code === 'KeyR') { rotateKeyHeld = true; return; }
 
-        let moved = false;
-        // Axis convention decision:
-        // ArrowUp should feel like positive "forward" in the displayed grid,
-        // so we map it to +Y and ArrowDown to -Y.
-        // (This intentionally reverses the previous mapping that felt inverted.)
-        if (e.code === 'ArrowLeft') moved = movePlayer4d(-1, 0, 0);
-        else if (e.code === 'ArrowRight') moved = movePlayer4d(1, 0, 0);
-        else if (e.code === 'ArrowUp') moved = movePlayer4d(0, 1, 0);
-        else if (e.code === 'ArrowDown') moved = movePlayer4d(0, -1, 0);
-        else if (e.code === 'KeyW') moved = movePlayer4d(0, 0, 1);
-        else if (e.code === 'KeyS') moved = movePlayer4d(0, 0, -1);
-        else if (e.code === 'KeyE' || e.code === 'KeyD') {
-            if (scanActive4d) e.preventDefault();
-            return;
-        } else return;
-
-        e.preventDefault();
-        drawHyperVolume4d();
-        if (moved) {
-            if (playerReachedEnd4d()) {
-                setStatus('Scan complete! Reached the end anchor on this cross-section.', 'success');
-            } else {
-                setStatus(`Player moved to (${player4d.x}, ${player4d.y}, ${player4d.z}).`, 'neutral');
-            }
-        } else {
-            setStatus('Blocked: target cell is out of bounds or not present in the current slice.', 'error');
+        // Prevent page scroll for movement keys in scan mode.
+        if (scanActive4d && (
+            e.code === 'ArrowLeft' || e.code === 'ArrowRight' ||
+            e.code === 'ArrowUp'   || e.code === 'ArrowDown'  ||
+            e.code === 'KeyW'      || e.code === 'KeyS'       ||
+            e.code === 'KeyE'      || e.code === 'KeyD'
+        )) {
+            e.preventDefault();
         }
     });
 
