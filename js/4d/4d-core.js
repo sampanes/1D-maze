@@ -35,6 +35,10 @@ let keysDown4d = {};
 // Float world-space player position (set here so initGrid4d can reset it before physics loads).
 let player4d = { sx: 0, sy: 0, sz: 0 };
 
+// Z-layer focus within the active hyperdiagonal prism.
+// -1 = released (all Z visible at full opacity); 0..N-1 = focused z-slice.
+let editLayerZ4d = -1;
+
 // ── Anchor cells ──────────────────────────────────────────────────────────────
 //
 // Start = (x=0, y=0, z=0, w=N-1) → x+w = N-1  (center hyperdiagonal)
@@ -112,6 +116,8 @@ function initGrid4d(n) {
     scanActive4d = false;
     keysDown4d = {};
     player4d = { sx: 0, sy: 0, sz: 0 };
+    editLayerZ4d = -1;
+    invalidateCrossSection4d();
 }
 
 function inBounds4d(x, y, z, w) {
@@ -130,6 +136,7 @@ function setCell4d(x, y, z, w, value) {
     if (!inBounds4d(x, y, z, w)) return false;
     if (isAnchorCell4d(x, y, z, w)) return false;
     grid4d[w][z][y][x] = value ? 1 : 0;
+    invalidateCrossSection4d();
     return true;
 }
 
@@ -137,6 +144,7 @@ function toggleCell4d(x, y, z, w) {
     if (!inBounds4d(x, y, z, w)) return false;
     if (isAnchorCell4d(x, y, z, w)) return false;
     grid4d[w][z][y][x] = grid4d[w][z][y][x] ? 0 : 1;
+    invalidateCrossSection4d();
     return true;
 }
 
@@ -197,11 +205,20 @@ function segToWorldBox(seg, N) {
     };
 }
 
+// Cache last cross-section so static frames don't rebuild N^4 geometry.
+let _csCache    = null;
+let _csCacheKey = '';
+
+function invalidateCrossSection4d() { _csCache = null; _csCacheKey = ''; }
+
 /**
  * Build walkable world-space box geometry for the current hyperplane cross-section.
  * Mirrors buildCrossSection() from geometry.js — one dimension higher.
  */
 function buildCrossSection4d(S4) {
+    const key = S4.toFixed(9) + '|' + gridSize4d;
+    if (_csCache && _csCacheKey === key) return _csCache;
+
     const N = gridSize4d;
     const passable = [];
     const pathBoxes = [];
@@ -230,7 +247,9 @@ function buildCrossSection4d(S4) {
         }
     }
 
-    return { passable, startBox, endBox, pathBoxes };
+    _csCache    = { passable, startBox, endBox, pathBoxes };
+    _csCacheKey = key;
+    return _csCache;
 }
 
 // ── Continuous player physics ─────────────────────────────────────────────────
@@ -246,10 +265,12 @@ const PLAYER4D_BLOCKED_BEEP_COOLDOWN_MS = 130;
 let lastBlockedBeep4d = 0;
 
 function pointInBox4d(sx, sy, sz, box) {
-    const EPS = 0.0005;
-    return sx >= box.x0 + EPS && sx <= box.x1 - EPS
-        && sy >= box.y0 + EPS && sy <= box.y1 - EPS
-        && sz >= box.z0 + EPS && sz <= box.z1 - EPS;
+    // No positive EPS — a gap of 0.001 at every cell boundary is large enough to
+    // make the player "invalid" at any wall face, triggering spurious stabilization
+    // and teleportation.  Inclusive boundary lets adjacent cells share their face.
+    return sx >= box.x0 && sx <= box.x1
+        && sy >= box.y0 && sy <= box.y1
+        && sz >= box.z0 && sz <= box.z1;
 }
 
 function pointPassable4d(sx, sy, sz, cs) {
@@ -279,11 +300,14 @@ function canOccupy4d(sx, sy, sz, cs) {
 
 function clampToWorld4d(sx, sy, sz) {
     const N = gridSize4d;
-    const halfX = (N - 1) / 2 + 1;
+    // World-X is NOT centred at 0.  At any valid slice S ∈ [0, N√2] a cell (x,w)
+    // can produce wx ∈ [-(N+1)/2, (3N-1)/2].  The old ±halfX clamp was too narrow
+    // on the positive side, making the end cell unreachable for N ≥ 3.
+    // canOccupy4d handles the actual per-box constraint; this just prevents overflow.
     return {
-        sx: Math.max(-halfX + PLAYER4D_RADIUS, Math.min(halfX - PLAYER4D_RADIUS, sx)),
-        sy: Math.max(PLAYER4D_RADIUS, Math.min(N - PLAYER4D_RADIUS, sy)),
-        sz: Math.max(PLAYER4D_RADIUS, Math.min(N - PLAYER4D_RADIUS, sz)),
+        sx: Math.max(-(N + 1) / 2, Math.min((3 * N - 1) / 2, sx)),
+        sy: Math.max(-0.5,          Math.min(N + 0.5,          sy)),
+        sz: Math.max(-0.5,          Math.min(N + 0.5,          sz)),
     };
 }
 
@@ -413,7 +437,26 @@ function stabilizePlayer4d(cs) {
         }
     }
 
-    if (cs.startBox) {
+    // Ring search failed.  Teleporting to start is jarring — find the nearest
+    // passable box centre instead to minimise perceived jump distance.
+    const allBoxes = [];
+    if (cs.startBox) allBoxes.push(cs.startBox);
+    if (cs.endBox)   allBoxes.push(cs.endBox);
+    for (const b of cs.passable) allBoxes.push(b);
+
+    let bestBox = null, bestDist2 = Infinity;
+    for (const b of allBoxes) {
+        const cx = (b.x0 + b.x1) * 0.5;
+        const cy = (b.y0 + b.y1) * 0.5;
+        const cz = (b.z0 + b.z1) * 0.5;
+        const d2 = (player4d.sx - cx) ** 2 + (player4d.sy - cy) ** 2 + (player4d.sz - cz) ** 2;
+        if (d2 < bestDist2) { bestDist2 = d2; bestBox = b; }
+    }
+    if (bestBox) {
+        player4d.sx = (bestBox.x0 + bestBox.x1) * 0.5;
+        player4d.sy = (bestBox.y0 + bestBox.y1) * 0.5;
+        player4d.sz = (bestBox.z0 + bestBox.z1) * 0.5;
+    } else if (cs.startBox) {
         player4d.sx = (cs.startBox.x0 + cs.startBox.x1) * 0.5;
         player4d.sy = (cs.startBox.y0 + cs.startBox.y1) * 0.5;
         player4d.sz = (cs.startBox.z0 + cs.startBox.z1) * 0.5;
@@ -564,6 +607,86 @@ function getBfsPathSetForHyperDiagonal(d4) {
         if (x + w === d4) set.add(`${x},${y},${z},${w}`);
     }
     return set.size > 0 ? set : null;
+}
+
+// ── Peek mode ─────────────────────────────────────────────────────────────────
+
+let peeking4d = false;
+
+/**
+ * Return the hyperdiagonal index that best represents the current hyperSliceOffset.
+ * Mirrors pickEditorLayerForSlice() from ui3d.js.
+ */
+function pickEditorLayerForHyperSlice4d() {
+    const d4 = hyperSliceOffset * SQRT2_4D - 1;
+    return clamp4d(Math.round(d4), 0, maxHyperLayerIndex4d());
+}
+
+// ── Serialization ─────────────────────────────────────────────────────────────
+//
+// Format: <2-hex N><hex-packed bits>  (mirrors serializeMaze3dToHex in lattice.js)
+// Iteration order: w, z, y, x (matches grid4d[w][z][y][x] storage).
+// Anchor cells are always encoded as 0 (passable) so they compress away.
+
+function serializeMaze4dToHex() {
+    const N = gridSize4d;
+    const sizeHex = N.toString(16).toUpperCase().padStart(2, '0');
+    let bits = '';
+
+    for (let w = 0; w < N; w++) {
+        for (let z = 0; z < N; z++) {
+            for (let y = 0; y < N; y++) {
+                for (let x = 0; x < N; x++) {
+                    bits += (!isAnchorCell4d(x, y, z, w) && grid4d[w][z][y][x]) ? '1' : '0';
+                }
+            }
+        }
+    }
+
+    while (bits.length % 4 !== 0) bits += '0';
+    let hex = '';
+    for (let i = 0; i < bits.length; i += 4) {
+        hex += parseInt(bits.slice(i, i + 4), 2).toString(16).toUpperCase();
+    }
+    return sizeHex + hex.replace(/0+$/, '');
+}
+
+/**
+ * Restore grid from a serialized hex string.
+ * Returns true on success; the caller is responsible for updating DOM (slider, etc.)
+ * and calling runBfs() / redraw.
+ */
+function applySerializedMap4d(mapString) {
+    if (!mapString || mapString.length < 2) return false;
+
+    const parsedSize = parseInt(mapString.slice(0, 2), 16);
+    if (!Number.isFinite(parsedSize) || parsedSize < 3 || parsedSize > 10) return false;
+
+    initGrid4d(parsedSize);
+
+    const payload = (mapString.slice(2).toUpperCase().match(/[0-9A-F]/g) || []).join('');
+    const N = parsedSize;
+    const totalCells = N * N * N * N;
+    let cellIndex = 0;
+
+    for (let idx = 0; idx < payload.length && cellIndex < totalCells; idx++) {
+        const nibble = parseInt(payload[idx], 16);
+        for (let bit = 3; bit >= 0 && cellIndex < totalCells; bit--) {
+            const value = (nibble >> bit) & 1;
+            const plane = N * N * N;
+            const w  = Math.floor(cellIndex / plane);
+            const r1 = cellIndex % plane;
+            const z  = Math.floor(r1 / (N * N));
+            const r2 = r1 % (N * N);
+            const y  = Math.floor(r2 / N);
+            const x  = r2 % N;
+            if (!isAnchorCell4d(x, y, z, w)) grid4d[w][z][y][x] = value;
+            cellIndex++;
+        }
+    }
+
+    bfs4d();
+    return true;
 }
 
 // ── Mode transitions ──────────────────────────────────────────────────────────

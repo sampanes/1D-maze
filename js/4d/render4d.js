@@ -84,8 +84,12 @@ function toWorldZ(v)     { return v / SQRT2_4D; }
 function drawHyperVolume4d() {
     hyperCtx.clearRect(0, 0, hyperCanvas.width, hyperCanvas.height);
     pickCells4d = [];
-    if (scanActive4d) drawScanSlice4d();
-    else              drawEditLayer4d();
+    if (scanActive4d && !peeking4d) {
+        drawScanSlice4d();
+        drawPlayerDot4d();
+    } else {
+        drawEditLayer4d();
+    }
 }
 
 // ── Edit mode: render the active hyperdiagonal slice ─────────────────────────
@@ -101,66 +105,78 @@ function drawHyperVolume4d() {
 function drawEditLayer4d() {
     const N  = gridSize4d;
     const d4 = hyperLayer;
-    // Full-width slice for this diagonal.
-    const S4 = hyperLayerToSlice4d(d4);
-    // Path cells on this diagonal (null when unsolvable or no path crosses here).
+    // Path cells on the active diagonal (null when unsolvable or no path crosses here).
     const pathSet = getBfsPathSetForHyperDiagonal(d4);
 
     const cubes = [];
 
-    // Iterate only cells on the active hyperdiagonal.
-    const xMin = Math.max(0, d4 - (N - 1));
-    const xMax = Math.min(N - 1, d4);
-
-    for (let x = xMin; x <= xMax; x++) {
-        const w = d4 - x;
+    // Iterate ALL cells — active diagonal at full alpha, others as faint ghost context.
+    // Mirrors drawMaze3d which renders every diagonal with layered opacity so the full
+    // 4D volume shape is always visible as structural context.
+    for (let w = 0; w < N; w++) {
         for (let z = 0; z < N; z++) {
             for (let y = 0; y < N; y++) {
-                const seg = getCellSliceSegment4d(x, y, z, w, S4);
-                if (!seg) continue; // should not occur at the full-width slice
+                for (let x = 0; x < N; x++) {
+                    const cellDiag   = x + w;
+                    const isActiveDiag = cellDiag === d4;
 
-                const isWall = getCell4d(x, y, z, w) === 1;
+                    // Project each cell at its own diagonal centre so ghost cells sit at
+                    // their natural world-space positions (spread across the diagonal axis).
+                    const S_cell = hyperLayerToSlice4d(cellDiag);
+                    const seg = getCellSliceSegment4d(x, y, z, w, S_cell);
+                    if (!seg) continue;
 
-                // Convert scan-space box to world-space corners.
-                const wx0 = toWorldX(seg.x0, N), wx1 = toWorldX(seg.x1, N);
-                const wy0 = toWorldY(seg.y0),    wy1 = toWorldY(seg.y1);
-                const wz0 = toWorldZ(seg.z0),    wz1 = toWorldZ(seg.z1);
+                    const isWall = getCell4d(x, y, z, w) === 1;
 
-                const cornersWorld = [
-                    [wx0, wy0, wz0], [wx1, wy0, wz0],
-                    [wx1, wy1, wz0], [wx0, wy1, wz0],
-                    [wx0, wy0, wz1], [wx1, wy0, wz1],
-                    [wx1, wy1, wz1], [wx0, wy1, wz1],
-                ];
+                    const wx0 = toWorldX(seg.x0, N), wx1 = toWorldX(seg.x1, N);
+                    const wy0 = toWorldY(seg.y0),    wy1 = toWorldY(seg.y1);
+                    const wz0 = toWorldZ(seg.z0),    wz1 = toWorldZ(seg.z1);
 
-                const corners = cornersWorld.map(pt => project3d(pt[0], pt[1], pt[2], N));
-                if (corners.some(pt => pt === null)) continue;
+                    const cornersWorld = [
+                        [wx0, wy0, wz0], [wx1, wy0, wz0],
+                        [wx1, wy1, wz0], [wx0, wy1, wz0],
+                        [wx0, wy0, wz1], [wx1, wy0, wz1],
+                        [wx1, wy1, wz1], [wx0, wy1, wz1],
+                    ];
 
-                const depth = corners.reduce((acc, pt) => acc + pt[2], 0) / corners.length;
+                    const corners = cornersWorld.map(pt => project3d(pt[0], pt[1], pt[2], N));
+                    if (corners.some(pt => pt === null)) continue;
 
-                // All edit-mode cells are on the active diagonal — use centre for pick.
-                const cx = (wx0 + wx1) * 0.5;
-                const cy = (wy0 + wy1) * 0.5;
-                const cz = (wz0 + wz1) * 0.5;
-                const cp = project3d(cx, cy, cz, N);
-                if (cp) pickCells4d.push({ x, y, z, w, depth, sx: cp[0], sy: cp[1] });
+                    const depth = corners.reduce((acc, pt) => acc + pt[2], 0) / corners.length;
 
-                const EPS = 0.0005;
-                const isPlayer = player4d.sx >= wx0 + EPS && player4d.sx <= wx1 - EPS
-                    && player4d.sy >= wy0 + EPS && player4d.sy <= wy1 - EPS
-                    && player4d.sz >= wz0 + EPS && player4d.sz <= wz1 - EPS;
+                    // Only pickable cells enter the pick buffer:
+                    // must be on the active diagonal AND on the focused Z-layer (if any).
+                    const isPickable = isActiveDiag && (editLayerZ4d < 0 || z === editLayerZ4d);
+                    if (isPickable) {
+                        const cx = (wx0 + wx1) * 0.5;
+                        const cy = (wy0 + wy1) * 0.5;
+                        const cz = (wz0 + wz1) * 0.5;
+                        const cp = project3d(cx, cy, cz, N);
+                        if (cp) pickCells4d.push({ x, y, z, w, depth, sx: cp[0], sy: cp[1] });
+                    }
 
-                cubes.push({
-                    corners,
-                    depth,
-                    isWall,
-                    isPath:       !!(pathSet && pathSet.has(`${x},${y},${z},${w}`)),
-                    isActiveLayer: true, // all edit cells are on the active diagonal
-                    isPlayer,
-                    isStart:  isStartCell4d(x, y, z, w),
-                    isEnd:    isEndCell4d(x, y, z, w),
-                    mode: 'edit',
-                });
+                    const EPS = 0.0005;
+                    const isPlayer = isActiveDiag
+                        && player4d.sx >= wx0 + EPS && player4d.sx <= wx1 - EPS
+                        && player4d.sy >= wy0 + EPS && player4d.sy <= wy1 - EPS
+                        && player4d.sz >= wz0 + EPS && player4d.sz <= wz1 - EPS;
+
+                    // Z-layer focus applies only within the active diagonal.
+                    const isActiveLayer = isActiveDiag && (editLayerZ4d < 0 || z === editLayerZ4d);
+
+                    cubes.push({
+                        corners,
+                        depth,
+                        isWall,
+                        isPath:       isActiveDiag && !!(pathSet && pathSet.has(`${x},${y},${z},${w}`)),
+                        isActiveLayer,
+                        isActiveDiag,
+                        isPlayer,
+                        isStart:  isStartCell4d(x, y, z, w),
+                        isEnd:    isEndCell4d(x, y, z, w),
+                        mode: 'edit',
+                    });
+                }
             }
         }
     }
@@ -217,18 +233,13 @@ function drawScanSlice4d() {
                         if (cp) pickCells4d.push({ x, y, z, w, depth, sx: cp[0], sy: cp[1] });
                     }
 
-                    const EPS2 = 0.0005;
-                    const isPlayerScan = player4d.sx >= wx0 + EPS2 && player4d.sx <= wx1 - EPS2
-                        && player4d.sy >= wy0 + EPS2 && player4d.sy <= wy1 - EPS2
-                        && player4d.sz >= wz0 + EPS2 && player4d.sz <= wz1 - EPS2;
-
                     cubes.push({
                         corners,
                         depth,
                         isWall,
                         isPath:       !!(pathSet && pathSet.has(`${x},${y},${z},${w}`)),
                         isActiveLayer: (x + w) === hyperLayer,
-                        isPlayer: isPlayerScan,
+                        isPlayer: false,
                         isStart:  isStartCell4d(x, y, z, w),
                         isEnd:    isEndCell4d(x, y, z, w),
                         mode: 'scan',
@@ -250,6 +261,34 @@ function drawCube(cube) {
         [2, 3, 7, 6], [3, 0, 4, 7],
         [0, 1, 2, 3], [4, 5, 6, 7],
     ];
+
+    // Ghost diagonal in edit mode: very low alpha structural context.
+    // Skip expensive semantic-colour logic; anchors get a slight boost.
+    if (cube.mode === 'edit' && !cube.isActiveDiag) {
+        const isAnchor = cube.isStart || cube.isEnd;
+        const color = cube.isStart ? [93, 255, 176]
+                    : cube.isEnd   ? [255, 106, 106]
+                    : cube.isWall  ? [22, 28, 42]
+                                   : [95, 145, 235];
+        const alpha = isAnchor ? 0.13 : (cube.isWall ? 0.06 : 0.012);
+        faces.forEach((face, i) => {
+            hyperCtx.beginPath();
+            hyperCtx.moveTo(cube.corners[face[0]][0], cube.corners[face[0]][1]);
+            for (let j = 1; j < face.length; j++) {
+                hyperCtx.lineTo(cube.corners[face[j]][0], cube.corners[face[j]][1]);
+            }
+            hyperCtx.closePath();
+            const shade = 0.56 + i * 0.08;
+            hyperCtx.fillStyle = `rgba(${Math.round(color[0]*shade)},${Math.round(color[1]*shade)},${Math.round(color[2]*shade)},${alpha})`;
+            hyperCtx.fill();
+            if (isAnchor) {
+                hyperCtx.strokeStyle = 'rgba(255,255,255,0.06)';
+                hyperCtx.lineWidth = 0.5;
+                hyperCtx.stroke();
+            }
+        });
+        return;
+    }
 
     const isInactive = !cube.isActiveLayer;
 
@@ -309,6 +348,40 @@ function drawCube(cube) {
         hyperCtx.lineWidth = cube.isPlayer ? 1.5 : (isInactive ? 0.6 : 1);
         hyperCtx.stroke();
     });
+}
+
+// ── Player dot (scan mode) ────────────────────────────────────────────────────
+//
+// Drawn AFTER all cubes so it always appears on top.
+// A radial-gradient halo + a hard bright core give the "glowing" look.
+
+function drawPlayerDot4d() {
+    const N  = gridSize4d;
+    const pt = project3d(player4d.sx, player4d.sy, player4d.sz, N);
+    if (!pt) return;
+    const [sx, sy] = pt;
+
+    hyperCtx.save();
+
+    // Soft outer glow
+    const grd = hyperCtx.createRadialGradient(sx, sy, 1, sx, sy, 20);
+    grd.addColorStop(0,    'rgba(180,255,80,0.55)');
+    grd.addColorStop(0.4,  'rgba(125,255,46,0.22)');
+    grd.addColorStop(1,    'rgba(80,200,20,0)');
+    hyperCtx.beginPath();
+    hyperCtx.arc(sx, sy, 20, 0, Math.PI * 2);
+    hyperCtx.fillStyle = grd;
+    hyperCtx.fill();
+
+    // Hard bright core
+    hyperCtx.shadowColor = 'rgba(160,255,70,0.85)';
+    hyperCtx.shadowBlur  = 12;
+    hyperCtx.beginPath();
+    hyperCtx.arc(sx, sy, 4, 0, Math.PI * 2);
+    hyperCtx.fillStyle = 'rgba(225,255,160,0.97)';
+    hyperCtx.fill();
+
+    hyperCtx.restore();
 }
 
 // ── Click / pick ──────────────────────────────────────────────────────────────

@@ -14,6 +14,18 @@
     <h1>◆ 4D Hyper-Maze Architect ◆</h1>
     <p>Build in 4D, then scan a true 3D cross-section through x+w=constant with smooth hyper-shifting.</p>
     <div class="header-nav-links">
+      <a href="index.html" style="
+        display: inline-block;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #7afcff;
+        border: 1px solid rgba(122,252,255,0.28);
+        border-radius: 999px;
+        padding: 4px 12px;
+        text-decoration: none;
+        letter-spacing: 0.03em;
+        transition: opacity 0.15s;
+      ">← 2D Game</a>
       <a href="scan3d.html" style="
         display: inline-block;
         font-size: 0.78rem;
@@ -25,6 +37,7 @@
         text-decoration: none;
         letter-spacing: 0.03em;
         transition: opacity 0.15s;
+        margin-left: 6px;
       ">← 3D Game</a>
     </div>
   </div>
@@ -32,18 +45,46 @@
   <div class="controls">
     <div class="control-group">
       <label for="gridSlider">Grid Size (N)</label>
-      <input id="gridSlider" type="range" min="3" max="10" value="5" step="1" />
-      <span class="val" id="gridVal">5</span>
+      <input id="gridSlider" type="range" min="3" max="6" value="4" step="1" />
+      <span class="val" id="gridVal">4</span>
     </div>
 
     <div class="control-group">
-      <label>Layer (x+w)</label>
+      <label>Z-Layer</label>
+      <button id="zLayerPrevBtn" class="layer-nav-btn">◀</button>
+      <span id="zLayerDisplay" class="val">—</span>
+      <button id="zLayerNextBtn" class="layer-nav-btn">▶</button>
+      <button id="btnReleaseZ" style="
+        margin-left: 4px;
+        padding: 4px 10px;
+        background: rgba(122,252,255,0.10);
+        color: #7afcff;
+        border-radius: 999px;
+        border: 1px solid rgba(122,252,255,0.28);
+        font-size: 0.78rem;
+        font-weight: 700;
+        cursor: pointer;
+      ">Release</button>
+    </div>
+
+    <div class="control-group">
+      <label>Hyper-Layer (x+w)</label>
       <button id="layerPrevBtn" class="layer-nav-btn">◀</button>
       <span id="layerDisplay" class="val">5</span>
       <button id="layerNextBtn" class="layer-nav-btn">▶</button>
     </div>
 
     <button id="btnScan" class="btn-scan" disabled>Start Scan</button>
+
+    <button id="btnGetLink" class="hidden" disabled style="
+        padding: 8px 16px;
+        background: rgba(255,216,79,0.12);
+        color: #ffd84f;
+        border-radius: 999px;
+        border: 1px solid rgba(255,216,79,0.38);
+        font-weight: 700;
+        cursor: pointer;
+      ">Get Link</button>
 
     <button id="btnValidate" style="
         padding: 8px 16px;
@@ -84,6 +125,39 @@
     <div class="canvas-wrapper">
       <canvas id="hyperCanvas" width="800" height="600" style="background: #0d1018; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.5);"></canvas>
     </div>
+    <!-- Hyper-slice progress bar (M10.3) -->
+    <div style="margin: 6px auto 0; max-width: 800px; height: 5px; background: rgba(122,252,255,0.08); border-radius: 999px; overflow: hidden;">
+      <div id="hyperSliceFill" style="height: 100%; background: rgba(122,252,255,0.55); border-radius: 999px; width: 50%; transition: width 0.04s linear;"></div>
+    </div>
+    <div id="scanReadout4d" style="
+      display: none;
+      margin-top: 6px;
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: #9db1d8;
+      letter-spacing: 0.04em;
+      text-align: center;
+    "></div>
+  </div>
+
+  <!-- First-run scan hint (M10.4) -->
+  <div id="hyperScanHint" style="
+    display: none;
+    margin: 8px auto;
+    max-width: 800px;
+    padding: 10px 40px 10px 16px;
+    background: rgba(122,252,255,0.05);
+    border: 1px solid rgba(122,252,255,0.16);
+    border-radius: 8px;
+    font-size: 0.8rem;
+    color: #9db1d8;
+    text-align: center;
+    position: relative;
+  ">
+    <strong style="color:#7afcff">E / D</strong> shifts the hyper-slice — the 3D world morphs as you move through the 4th dimension.
+    Near the range edges the volume thins to a flat plane.
+    Hold <strong style="color:#7afcff">P</strong> to peek at the editor layer.
+    <button id="btnDismissHint" style="position:absolute;top:6px;right:10px;background:none;border:none;color:#7afcff;cursor:pointer;font-size:1rem;opacity:0.55;line-height:1;">✕</button>
   </div>
 
   <!-- Scripts -->
