@@ -355,13 +355,18 @@ function tryAxisSlide4d(pdx, pdy, pdz, sdx, sdy, sdz, cs) {
         return true;
     }
 
-    // Nudge each secondary axis independently to slide around corners.
+    // Nudge secondary axes to slide around corners.
+    // Floor movement (X or Y = arrow keys) only nudges the other floor axis —
+    // nudging Z (diagonal) while walking would silently shift the 4th dimension,
+    // causing the world to morph unexpectedly.
+    // Vertical movement (Z = W/S) nudges both floor axes.
     let n1dx = 0, n1dy = 0, n1dz = 0;
     let n2dx = 0, n2dy = 0, n2dz = 0;
-    if (pdx !== 0 && pdy === 0 && pdz === 0) { n1dy = 1; n2dz = 1; }
-    else if (pdy !== 0 && pdx === 0 && pdz === 0) { n1dx = 1; n2dz = 1; }
-    else { n1dx = 1; n2dy = 1; }
+    if (pdx !== 0 && pdy === 0 && pdz === 0) { n1dy = 1; }           // X: nudge Y only
+    else if (pdy !== 0 && pdx === 0 && pdz === 0) { n1dx = 1; }      // Y: nudge X only
+    else { n1dx = 1; n2dy = 1; }                                      // Z/mixed: nudge X and Y
 
+    const hasN2 = n2dx !== 0 || n2dy !== 0 || n2dz !== 0;
     for (const n of PLAYER4D_NUDGES) {
         if (n === 0) continue;
         const r1 = sweepMove4d(pdx + n1dx * n, pdy + n1dy * n, pdz + n1dz * n, cs);
@@ -369,10 +374,12 @@ function tryAxisSlide4d(pdx, pdy, pdz, sdx, sdy, sdz, cs) {
             if (sdx !== 0 || sdy !== 0 || sdz !== 0) sweepMove4d(sdx, sdy, sdz, cs);
             return true;
         }
-        const r2 = sweepMove4d(pdx + n2dx * n, pdy + n2dy * n, pdz + n2dz * n, cs);
-        if (r2.moved) {
-            if (sdx !== 0 || sdy !== 0 || sdz !== 0) sweepMove4d(sdx, sdy, sdz, cs);
-            return true;
+        if (hasN2) {
+            const r2 = sweepMove4d(pdx + n2dx * n, pdy + n2dy * n, pdz + n2dz * n, cs);
+            if (r2.moved) {
+                if (sdx !== 0 || sdy !== 0 || sdz !== 0) sweepMove4d(sdx, sdy, sdz, cs);
+                return true;
+            }
         }
     }
     return false;
