@@ -474,13 +474,23 @@ function stabilizePlayer4d(cs) {
 function updatePlayer4d(dt, cs) {
     stabilizePlayer4d(cs);
 
-    let dx = 0, dy = 0, dz = 0;
-    if (keysDown4d['ArrowLeft'])  dx -= 1;
-    if (keysDown4d['ArrowRight']) dx += 1;
-    if (keysDown4d['ArrowUp'])    dy += 1;
-    if (keysDown4d['ArrowDown'])  dy -= 1;
-    if (keysDown4d['KeyW'])       dz += 1;
-    if (keysDown4d['KeyS'])       dz -= 1;
+    // Camera-relative axis remap (M11.1).
+    // Snap cameraAz4d to the nearest 90° quadrant; remap arrow keys to world X/Y accordingly.
+    const azDeg = ((cameraAz4d * 180 / Math.PI) % 360 + 360) % 360;
+    const face  = Math.floor((azDeg + 45) / 90) % 4;
+    const DX_RIGHT = [ 1,  0, -1,  0];
+    const DY_RIGHT = [ 0,  1,  0, -1];
+    const DX_UP    = [ 0, -1,  0,  1];
+    const DY_UP    = [ 1,  0, -1,  0];
+
+    const horiz = (keysDown4d['ArrowRight'] ? 1 : 0) - (keysDown4d['ArrowLeft'] ? 1 : 0);
+    const vert  = (keysDown4d['ArrowUp']    ? 1 : 0) - (keysDown4d['ArrowDown'] ? 1 : 0);
+
+    let dx = horiz * DX_RIGHT[face] + vert * DX_UP[face];
+    let dy = horiz * DY_RIGHT[face] + vert * DY_UP[face];
+    let dz = 0;
+    if (keysDown4d['KeyW']) dz += 1;
+    if (keysDown4d['KeyS']) dz -= 1;
     if (!dx && !dy && !dz) return;
 
     const m = Math.hypot(dx, dy, dz);
