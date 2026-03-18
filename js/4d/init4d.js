@@ -188,10 +188,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
+        const azDeg = ((cameraAz4d * 180 / Math.PI) % 360 + 360) % 360;
+        const elDeg = cameraEl4d * 180 / Math.PI;
         scanReadout.textContent =
             `S: ${hyperSliceOffset.toFixed(2)}  ` +
             `x: ${sx.toFixed(2)}  y: ${sy.toFixed(2)}  z: ${sz.toFixed(2)}  ` +
-            `[${cell}]` +
+            `[${cell}]  ` +
+            `az: ${azDeg.toFixed(1)}°  el: ${elDeg.toFixed(1)}°` +
             (peeking4d ? '  · PEEKING' : '');
     }
 
