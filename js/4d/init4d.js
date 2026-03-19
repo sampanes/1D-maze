@@ -365,11 +365,21 @@ document.addEventListener('DOMContentLoaded', () => {
         );
     });
 
+    // ── Mouse wheel zoom ──────────────────────────────────────────────────────
+
+    hyperCanvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+        cameraZoom4d = Math.max(0.25, Math.min(4.0, cameraZoom4d * factor));
+        drawHyperVolume4d();
+    }, { passive: false });
+
     // ── Reset camera ──────────────────────────────────────────────────────────
 
     btnResetView.addEventListener('click', () => {
-        cameraAz4d = 45 * Math.PI / 180;
-        cameraEl4d = 30 * Math.PI / 180;
+        cameraAz4d   = 45 * Math.PI / 180;
+        cameraEl4d   = 30 * Math.PI / 180;
+        cameraZoom4d = 1.0;
         drawHyperVolume4d();
     });
 

@@ -17,8 +17,9 @@ let hyperCtx;
 let hyperCanvas;
 
 // Camera — simple orbit (azimuth/elevation) around the scene centre.
-let cameraAz4d = 45 * Math.PI / 180;
-let cameraEl4d = 30 * Math.PI / 180;
+let cameraAz4d   = 45 * Math.PI / 180;
+let cameraEl4d   = 30 * Math.PI / 180;
+let cameraZoom4d = 1.0; // >1 = zoomed in, <1 = zoomed out
 
 // Pick buffer: projected cube centres for nearest-neighbour click selection.
 let pickCells4d = [];
@@ -33,7 +34,7 @@ function initRender4d() {
 function project3d(x, y, z, N) {
     const AZ = cameraAz4d;
     const EL = cameraEl4d;
-    const D  = N * 3.5;
+    const D  = N * 3.5 / cameraZoom4d;
 
     const center = (N - 1) / 2;
     const Cx = center, Cy = center, Cz = center;
@@ -349,7 +350,7 @@ function drawCube(cube) {
         hyperCtx.strokeStyle = cube.isPlayer
             ? 'rgba(220,255,180,0.95)'
             : `rgba(255,255,255,${isInactive ? 0.03 : (cube.isWall ? 0.22 : 0.11)})`;
-        hyperCtx.lineWidth = cube.isPlayer ? 1.5 : (isInactive ? 0.6 : 1);
+        hyperCtx.lineWidth = (cube.isPlayer ? 1.5 : (isInactive ? 0.6 : 1)) * Math.sqrt(cameraZoom4d);
         hyperCtx.stroke();
     });
 }
