@@ -711,7 +711,8 @@ function applySerializedMap4d(mapString) {
 function setScanActive4d(active) {
     scanActive4d = !!active;
     if (scanActive4d) {
-        // Enter scan at the center of the active hyperdiagonal (full cells visible).
+        // Enter scan at the canonical centre hyperdiagonal where Start/End live.
+        hyperLayer = gridSize4d - 1;
         hyperSliceOffset = hyperLayerToSlice4d(hyperLayer);
         // Place player at the start-box centre for this slice.
         const cs = buildCrossSection4d(hyperSliceOffset);
