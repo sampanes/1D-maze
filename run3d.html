@@ -8,10 +8,13 @@
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/game.css">
 </head>
-<body>
+<body style="min-height:100vh; background:
+  radial-gradient(circle at top, rgba(122,252,255,0.10), rgba(122,252,255,0.00) 30%),
+  linear-gradient(180deg, #09101a 0%, #04070d 55%, #020304 100%);
+">
   <div class="header">
     <h1>Diamond Maze IRL 3D</h1>
-    <p>Standalone first-person scaffold for 3D IRL mode. Existing scan mode remains untouched.</p>
+    <p>Standalone first-person route for the 3D maze. This page preserves the same 45 degree continuous slice paradigm and now decodes real shared maps in-browser.</p>
     <div class="header-nav-links">
       <a href="scan3d.html" style="
         display: inline-block;
@@ -41,34 +44,135 @@
 
   <div class="controls">
     <button id="btnOpenScan3d" class="btn-back">Back To 3D Scan</button>
+    <button id="btnLoadSample3d" class="btn-scan">Load Sample 3D Map</button>
+    <button id="btnLoadSample3dLarge" class="btn-validate">Load Larger Sample</button>
   </div>
 
-  <div id="statusBar" class="status-bar neutral">IRL 3D scaffold loaded.</div>
+  <div id="statusBar" class="status-bar neutral" style="max-width:min(1400px, 94vw); margin:0 auto 18px;">IRL 3D scaffold loaded.</div>
 
-  <div class="maze-section">
-    <div class="canvas-wrapper" style="display:block; max-width: 920px;">
-      <div style="
-        min-height: 320px;
-        border-radius: 12px;
-        background:
-          radial-gradient(circle at top, rgba(255,255,255,0.08), rgba(255,255,255,0.01) 35%, rgba(0,0,0,0.0) 60%),
-          linear-gradient(180deg, #05070b 0%, #020304 100%);
-        border: 1px solid rgba(122,252,255,0.12);
-        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02), 0 18px 45px rgba(0,0,0,0.35);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 32px;
-        text-align: center;
-      ">
-        <div>
-          <h2 style="margin:0 0 12px; color:#f2f5ff; font-size:1.35rem; font-weight:800;">3D IRL Route Is Live</h2>
-          <p id="run3dSummary" style="margin:0; color:#9db1d8;">Waiting for initialization.</p>
+  <main style="
+    width:min(1400px, 94vw);
+    margin:0 auto 28px;
+    display:grid;
+    grid-template-columns:minmax(280px, 360px) minmax(0, 1fr);
+    gap:18px;
+    align-items:stretch;
+  ">
+    <section style="
+      border-radius:18px;
+      border:1px solid rgba(122,252,255,0.14);
+      background:linear-gradient(180deg, rgba(10,16,28,0.94), rgba(6,10,18,0.96));
+      box-shadow:0 26px 60px rgba(0,0,0,0.28);
+      padding:20px 18px;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    ">
+      <div>
+        <div style="color:#7afcff; font-size:0.78rem; font-weight:800; letter-spacing:0.14em; text-transform:uppercase;">Milestone 1</div>
+        <h2 style="margin:8px 0 10px; color:#f2f5ff; font-size:1.45rem; line-height:1.15;">3D Map Decode Test Surface</h2>
+        <p id="run3dSummary" style="margin:0; color:#9db1d8; line-height:1.55;">Waiting for initialization.</p>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px;">
+        <div style="padding:12px 12px 10px; border-radius:14px; background:rgba(122,252,255,0.05); border:1px solid rgba(122,252,255,0.10);">
+          <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Grid Size</div>
+          <div id="run3dGridSize" style="margin-top:6px; color:#f2f5ff; font-size:1.55rem; font-weight:800;">--</div>
+        </div>
+        <div style="padding:12px 12px 10px; border-radius:14px; background:rgba(122,252,255,0.05); border:1px solid rgba(122,252,255,0.10);">
+          <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Walkability</div>
+          <div id="run3dSolvable" style="margin-top:6px; color:#f2f5ff; font-size:1.25rem; font-weight:800;">Awaiting map</div>
+        </div>
+        <div style="padding:12px 12px 10px; border-radius:14px; background:rgba(122,252,255,0.05); border:1px solid rgba(122,252,255,0.10);">
+          <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Cells</div>
+          <div id="run3dCellCount" style="margin-top:6px; color:#f2f5ff; font-size:1.55rem; font-weight:800;">--</div>
+        </div>
+        <div style="padding:12px 12px 10px; border-radius:14px; background:rgba(122,252,255,0.05); border:1px solid rgba(122,252,255,0.10);">
+          <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Path Length</div>
+          <div id="run3dPathLength" style="margin-top:6px; color:#f2f5ff; font-size:1.55rem; font-weight:800;">--</div>
         </div>
       </div>
-    </div>
-  </div>
 
+      <div style="padding:14px 14px 12px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);">
+        <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Load Source</div>
+        <div id="run3dMapSource" style="margin-top:8px; color:#d7e4ff; font-weight:700; line-height:1.45;">No URL parameter found.</div>
+        <div id="run3dMapMeta" style="margin-top:10px; color:#9db1d8; font-size:0.92rem; line-height:1.5;">Open this page with `?map3d=...` or `?map=...` to run the decode test.</div>
+      </div>
+
+      <div style="padding:14px 14px 12px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);">
+        <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Milestone 1 Browser Test</div>
+        <ul style="margin:10px 0 0; padding-left:18px; color:#d7e4ff; line-height:1.55;">
+          <li id="run3dCheckBoot">Page boots with no URL map and no console errors.</li>
+          <li id="run3dCheckMap3d">`?map3d=` decodes and reports grid/path metadata.</li>
+          <li id="run3dCheckFallback">`?map=` fallback also decodes.</li>
+          <li id="run3dCheckOverview">The overview canvas below visibly reflects the reconstructed 3D maze.</li>
+        </ul>
+      </div>
+
+      <div style="padding:14px 14px 12px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);">
+        <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Known Good Samples</div>
+        <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+          <button id="btnLoadSample3dSmallLink" style="
+            text-align:left;
+            padding:10px 12px;
+            border-radius:12px;
+            border:1px solid rgba(122,252,255,0.18);
+            background:rgba(122,252,255,0.05);
+            color:#e9f5ff;
+            font-weight:700;
+            cursor:pointer;
+          ">3x3x3 NOICE</button>
+          <button id="btnLoadSample3dLargeLink" style="
+            text-align:left;
+            padding:10px 12px;
+            border-radius:12px;
+            border:1px solid rgba(122,252,255,0.18);
+            background:rgba(122,252,255,0.05);
+            color:#e9f5ff;
+            font-weight:700;
+            cursor:pointer;
+          ">5x5x5 LOOPY</button>
+        </div>
+      </div>
+    </section>
+
+    <section style="
+      border-radius:20px;
+      border:1px solid rgba(122,252,255,0.14);
+      background:
+        radial-gradient(circle at top, rgba(122,252,255,0.08), rgba(122,252,255,0.01) 34%, rgba(0,0,0,0) 60%),
+        linear-gradient(180deg, rgba(9,14,25,0.96), rgba(4,6,10,0.98));
+      box-shadow:0 30px 70px rgba(0,0,0,0.34);
+      padding:18px;
+      min-height:72vh;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    ">
+      <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+        <div>
+          <div style="color:#7afcff; font-size:0.78rem; font-weight:800; letter-spacing:0.12em; text-transform:uppercase;">Decoded Slice World</div>
+          <h2 style="margin:8px 0 0; color:#f2f5ff; font-size:1.4rem; line-height:1.15;">Embodied View</h2>
+        </div>
+          <div id="run3dOverviewCaption" style="color:#9db1d8; font-size:0.92rem;">No map loaded yet.</div>
+      </div>
+
+      <div style="
+        flex:1 1 auto;
+        min-height:480px;
+        border-radius:16px;
+        overflow:hidden;
+        border:1px solid rgba(255,255,255,0.05);
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)),
+          linear-gradient(180deg, #060912 0%, #04070c 100%);
+      ">
+        <canvas id="run3dOverviewCanvas" width="1100" height="760" style="width:100%; height:100%; display:block;"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/3d-run/map3d-run-core.js"></script>
   <script src="js/3d-run/state3d-run.js"></script>
   <script src="js/3d-run/player3d-run.js"></script>
   <script src="js/3d-run/render3d-run.js"></script>

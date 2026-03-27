@@ -20,6 +20,16 @@ The governing strategy is:
 - reuse shared pure helpers only where it reduces risk
 - defer refactors until the IRL routes are working
 
+The governing visual/gameplay invariant is:
+
+- preserve the existing 45 degree continuous slice paradigm
+- preserve smooth slice-driven world morphing
+- only change the point of view and controls, not the underlying maze interpretation
+
+Stretch-goal invariant:
+
+- if a POV route is later added for the original 2D map / 1D runner, it must still preserve the existing 1D runner logic rather than turning into a free-roaming path game
+
 ## Current architecture baseline
 
 Before any milestone work, the baseline is:
@@ -42,6 +52,11 @@ The following already exist and should be treated as the source of truth where p
   - `js/3d/player3d.js`
 - 4D grid state, serialization, cross-section geometry, movement legality:
   - `js/4d/4d-core.js`
+
+This means:
+
+- Milestone work must not accidentally drift into a discrete-floor interpretation
+- If a milestone result looks like stepping between layers instead of smoothly morphing between them, it is not complete
 
 ## Milestone 0: Standalone Route Scaffold
 
@@ -147,11 +162,11 @@ Preferred order:
 - no final floor rendering yet
 - no pointer lock yet
 
-## Milestone 2: 3D IRL Walkable Floor
+## Milestone 2: 3D IRL Continuous Slice Embodiment
 
 ### Goal
 
-Turn the real 3D scan cross-section into a first-person scene:
+Turn the real 3D scan cross-section into an embodied POV scene:
 
 - white walkable platform
 - black infinite void
@@ -159,6 +174,11 @@ Turn the real 3D scan cross-section into a first-person scene:
 - no gravity
 
 This is the first milestone that should actually feel like the target experience.
+
+The key design constraint for this milestone is:
+
+- the platform must still be the same continuous 45 degree slice-world you already have now
+- the player is simply inhabiting it
 
 ### Primary files
 
@@ -187,6 +207,18 @@ The legal movement should still be governed by the existing 3D occupancy rules:
 
 The major change is input interpretation and rendering, not passability logic.
 
+The slice behavior must remain:
+
+- continuous
+- smooth
+- visibly morphing as `sliceOffset` changes
+
+This milestone must not collapse into:
+
+- discrete floor swapping
+- editor-layer stepping
+- a generic voxel floor model
+
 ### Controls for this milestone
 
 - mouse: yaw
@@ -204,6 +236,8 @@ The major change is input interpretation and rendering, not passability logic.
 - the player cannot walk into void
 - `Q/E` changes the slice and the floor updates
 - slice changes still use stabilization rather than custom teleport behavior
+- `Q/E` changes produce smooth continuous platform morphing, not stepped transitions
+- the IRL view still clearly reads as the same diagonal 45 degree paradigm, only embodied
 
 ### Risks
 
@@ -217,6 +251,7 @@ The major change is input interpretation and rendering, not passability logic.
 - no gravity
 - no jump
 - no polish-heavy art pass
+- no reinterpretation of the maze as stacked discrete levels
 
 ## Milestone 3: 3D IRL Usability Pass
 
@@ -240,6 +275,8 @@ Make the 3D IRL route feel intentional rather than prototype-only.
 - current map loaded indicator
 - stronger start/end visual treatment
 - clearer "back to scan" navigation
+- a thin glowing green locator rod from the avatar marker down to the current floor contact point
+- subtle contact shadows under the player marker and readable floor surfaces
 
 ### Done means
 
@@ -247,6 +284,8 @@ Make the 3D IRL route feel intentional rather than prototype-only.
 - the player knows how to enter/exit look mode
 - the page communicates that `Q/E` changes the slice
 - the route feels stable enough that 4D implementation can follow the same UX pattern
+- the player can intuitively tell where they are standing on the platform
+- the scene reads spatially without needing heavy realistic lighting
 
 ### Risks
 
@@ -332,6 +371,11 @@ The legal movement should still be governed by:
 
 The main change is the control scheme and camera transform.
 
+The key design constraint for this milestone is:
+
+- the current continuously morphing hyper-slice world remains the world
+- the player is moving inside that same world rather than a simplified replacement
+
 ### Controls for this milestone
 
 - mouse: yaw and pitch
@@ -357,6 +401,8 @@ Do not make pitch alter horizontal movement direction. Horizontal movement shoul
 - `Space` / `Shift` move vertically
 - `Q/E` shifts the 4th dimension
 - the player stays constrained by the existing 4D legality rules
+- `Q/E` produces smooth continuous world morphing, not discrete hyper-layer jumps
+- the route still feels like the same original scan paradigm, just from inside
 
 ### Risks
 
@@ -369,6 +415,7 @@ Do not make pitch alter horizontal movement direction. Horizontal movement shoul
 - no gravity
 - no jump impulse
 - no exotic 4D visualization beyond the current cross-section model
+- no reinterpretation into ordinary rooms or stacked discrete 3D levels
 
 ## Milestone 6: 4D Usability Pass
 
@@ -446,16 +493,75 @@ Do not do this while core behavior is still moving quickly.
 - refactoring too broadly after the routes already work
 - accidentally re-coupling scan and IRL pages
 
+## Stretch Goal: 2D Map / 1D Runner POV
+
+### Goal
+
+Add an over-the-shoulder or constrained POV presentation for the original 2D map / 1D runner.
+
+The intended feeling is:
+
+- walking a tight rope in space
+- or moving along a narrow floating road
+- with gaps appearing and disappearing as the underlying 1D scan changes
+
+### Important design rule
+
+The player's movement remains constrained to the current 1D runner path.
+
+That means:
+
+- the camera may look around
+- the player may move forward/backward along the rope
+- the camera angle must not redefine the runner direction
+
+So if the camera is rotated 90 degrees relative to the rope:
+
+- forward still means "advance along the rope"
+- backward still means "retreat along the rope"
+
+This avoids the control problem where camera-relative movement would fight the underlying 1D mechanic.
+
+### Recommended controls
+
+- mouse: view direction / camera orbit
+- `W` / `S` or `Up` / `Down`: move forward/backward along the current 1D path
+- keep the scan-line shift control separate from movement
+
+### This should not become
+
+- free `WASD` movement
+- a camera-relative walking system
+- a reinterpretation where the rope is just visual decoration
+
+### Candidate route structure
+
+If implemented, prefer a dedicated page:
+
+- `run1d.html`
+- `js/run-1d/`
+
+This should follow the same route-isolation principle used for `run3d.html` and `run4d.html`.
+
+### Suggested timing
+
+Do not start this until:
+
+- `run3d.html` is genuinely playable
+- `run4d.html` is genuinely playable
+- the shared POV patterns are stable enough to reuse safely
+
 ## Suggested execution order
 
 1. Milestone 0: Standalone Route Scaffold
 2. Milestone 1: 3D Map Load And Core Reuse Boundary
-3. Milestone 2: 3D IRL Walkable Floor
+3. Milestone 2: 3D IRL Continuous Slice Embodiment
 4. Milestone 3: 3D IRL Usability Pass
 5. Milestone 4: 4D Map Load And Core Reuse Boundary
 6. Milestone 5: 4D First-Person Traversal
 7. Milestone 6: 4D Usability Pass
 8. Milestone 7: Sharing Cleanup
+9. Stretch Goal: 2D Map / 1D Runner POV
 
 ## Progress tracking template
 
@@ -481,3 +587,9 @@ The IRL project is successful when all of the following are true:
 - both routes use the same existing map formats as the scan pages
 - existing `scan3d.html` and `scan4d.html` still work
 - the code structure remains understandable enough that future polish does not require a rewrite
+- both IRL routes preserve the existing smooth 45 degree slice-morphing paradigm rather than replacing it with discrete level changes
+
+Optional stretch success:
+
+- a future `run1d.html` presents the original 1D runner as an over-the-shoulder rope/road in space
+- movement remains constrained to the original runner axis even while the camera looks around

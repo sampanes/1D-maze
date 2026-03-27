@@ -106,6 +106,34 @@ This should add:
 - a first-person camera presentation for 4D scans
 - dedicated IRL URLs that do not require modifying the existing scan pages
 - a direct way to deep-link into the IRL variant
+- a stretch-goal POV presentation for the original 2D map / 1D runner
+
+## Core invariant: preserve the 45 degree paradigm
+
+This is the most important design constraint for the entire IRL feature:
+
+- the current 45 degree diagonal slice paradigm is not negotiable
+- IRL mode must inhabit the same world model the existing scan modes already use
+- IRL mode must not reinterpret the mazes as ordinary stacked floors or conventional voxel rooms
+
+In practical terms, this means:
+
+- 3D IRL must still be the current continuous diagonal slice through the 3D lattice
+- 4D IRL must still be the current continuous hyper-slice through the 4D lattice
+- all slice changes must remain smooth and continuous
+- visible geometry must morph continuously as the slice moves
+- the only major change is the camera/player embodiment, not the underlying maze model
+
+Another way to say it:
+
+- do not build a new game that merely uses the same encoded maps
+- build a new point of view inside the same continuously deforming slice-world
+
+This also applies to the original 2D map / 1D runner stretch goal:
+
+- the 1D runner should still be the same diagonal-line scanner logic
+- the visible tight-rope / narrow-road world should still come from the same 1D scan state
+- gaps should appear and disappear because the underlying line-state changes, not because a separate obstacle system was invented
 
 ## Control decisions
 
@@ -128,6 +156,7 @@ Rationale:
 - the current 3D scan already uses `W` / `S` for `sliceOffset`, but IRL mode needs standard first-person ground movement more than it needs keyboard continuity with the existing scan view
 - using `Q` / `E` for slice motion keeps the mechanic close at hand without colliding with `WASD`
 - no jump and no gravity preserve the intended "standing on a white platform over void" feel without turning it into a platformer
+- the slice motion on `Q/E` must remain smooth, not stepped, because the continuous transition is part of the core paradigm
 
 ### 4D IRL controls
 
@@ -148,6 +177,30 @@ Rationale:
 - `Space` + `Shift` is the cleanest up/down mapping once `WASD` is reserved for planar movement
 - `Q` / `E` is a better fit for hyper-shifting in mouse-look mode than the existing `E` / `D`, because `D` is needed for strafe-right
 - gravity can be revisited later as an optional polish/variant, but should not be part of the first implementation
+- the hyper-slice motion on `Q/E` must remain smooth and continuously deform the world, not jump between discrete 4D layers
+
+### 2D map / 1D runner POV stretch goal controls
+
+If this is built, the correct control model is:
+
+- mouse: changes view direction / camera orbit
+- forward/back input only: move along the rope/road itself
+- no lateral free movement
+- no camera-relative strafing
+
+Recommended mapping:
+
+- `W` / `S` or `Up` / `Down`: move forward/backward along the current 1D path
+- mouse: look around from an over-the-shoulder camera
+- the scan-line shift control should remain separate from path motion
+
+Important design rule:
+
+- the player's motion should remain constrained to the current 1D runner axis
+- camera angle should not redefine what "forward" means
+- even if the camera rotates 90 degrees relative to the rope, movement should still be "along the rope," not "where the camera faces"
+
+This avoids the control problem entirely and preserves the original game logic.
 
 ## Smallest sensible architecture change
 
@@ -172,6 +225,12 @@ The new renderer should interpret the current 2D slice geometry as:
 
 This produces the intended "standing on a white platform in infinite black space" feel while still matching the continuous slice logic already in place.
 
+Critical clarification:
+
+- this is not a stack of separate floors
+- this is the same 45 degree continuously moving slice you already have now
+- when the slice changes, the platform must smoothly widen, narrow, merge, and disappear according to the existing slice math
+
 ### 4D
 
 Keep the current 4D scan geometry and movement exactly as-is:
@@ -189,6 +248,12 @@ This means the 4D IRL work is primarily:
 - HUD and slice-shift feedback
 
 not a rewrite of the traversal model.
+
+Critical clarification:
+
+- this is not a new discrete-room interpretation of the 4D maze
+- this is the current continuously shifting 3D cross-section, viewed from inside
+- the world must morph smoothly as `hyperSliceOffset` changes
 
 ## Proposed implementation shape
 
@@ -391,6 +456,10 @@ Because IRL gets dedicated pages, the UI goal changes slightly:
 
 This is better than trying to maintain a heavy in-page toggle during the first implementation.
 
+Stretch-goal note:
+
+- if the original 2D map / 1D runner eventually gets a POV route, it should also get its own dedicated page rather than being folded into `index.html` immediately
+
 ### 3D IRL renderer
 
 Render the current `buildCrossSection(sliceOffset)` output as 3D floor slabs:
@@ -399,6 +468,13 @@ Render the current `buildCrossSection(sliceOffset)` output as 3D floor slabs:
 - start and end can remain green/red accents
 - path highlight can be optional or disabled in IRL mode
 - everything outside passable rects is void
+
+Very important:
+
+- the renderer must be driven every frame from the current `sliceOffset`
+- the floor shape must be regenerated from the current cross-section continuously
+- do not quantize the slice into editor diagonals or pseudo-levels
+- the whole point is that the world should transition smoothly exactly like the existing scan mode does
 
 Camera model:
 
@@ -421,6 +497,7 @@ Expected result:
 - no walls
 - player cannot step into void
 - current slice changes can still reshape the platform under the player, with existing stabilization logic handling invalid positions
+- the slice reshaping should feel like the same original 45 degree morph, not like changing between separate stages
 
 ### 4D IRL renderer
 
@@ -430,6 +507,34 @@ Render the current `buildCrossSection4d(hyperSliceOffset)` boxes from a first-pe
 - walls remain visible as solid dark boundaries
 - start/end keep their existing semantic colors
 - hyper-slice changes should visibly morph the space
+
+Very important:
+
+- the renderer must be driven every frame from the current `hyperSliceOffset`
+- visible space must change continuously as the hyper-slice moves
+- do not convert the world into discrete hyper-layers for traversal
+- the camera is moving through the same continuously deforming world the scan view already shows
+
+### 2D map / 1D runner POV stretch goal
+
+If pursued later, this mode should be treated as:
+
+- an over-the-shoulder or constrained-POV presentation of the existing 1D runner
+- a tight-rope / narrow-road in space
+- movement constrained strictly to the current runner line
+- gaps appearing and disappearing according to the existing 1D scan state
+
+This should not become:
+
+- a free-roaming 3D walkway game
+- a camera-relative movement system
+- a reinterpretation where turning the camera changes the runner axis
+
+The right mental model is:
+
+- the avatar is still moving on the same single navigable line
+- the camera is allowed to look around that line
+- gameplay still comes from the line changing underneath/around the player
 
 Camera model:
 
@@ -453,6 +558,7 @@ Technical note:
 - IRL mode should stop doing that and instead compute continuous forward/right vectors from camera yaw
 - pitch should affect camera view, not horizontal movement
 - vertical movement should remain explicit on `Space` / `Shift` rather than being coupled to look pitch
+- none of this should change the underlying continuous hyper-slice math
 
 ## File-level integration plan
 
@@ -524,6 +630,8 @@ Technical note:
 - IRL mode should reuse those outputs directly rather than sampling `grid3d` again.
 - The visual conversion should be "rectangles become floor slabs", not "voxelize the entire 3D maze again".
 - Because `run3d.html` is its own page, `render3d-run.js` should not try to coexist in the same render loop as `render3d.js`.
+- The authoritative animation is still "continuous sliceOffset changes produce continuous geometry changes."
+- If the IRL view ever looks like stepping between layers, that is a bug relative to the design goal.
 
 ### 4D input and movement
 
@@ -541,6 +649,8 @@ Technical note:
 - The new IRL renderer should reuse the same cross-section boxes but swap the orbit camera projection for a player-centered first-person projection.
 - Existing semantic coloring can be reused initially, then simplified later if needed for readability.
 - Because `run4d.html` is separate, `render4d-run.js` can be written purely for first-person rendering without carrying scan/orbit compatibility code.
+- The authoritative animation is still "continuous hyperSliceOffset changes produce continuous world morphing."
+- If the IRL view ever behaves like discrete layer hopping, that is a bug relative to the design goal.
 
 ## Behavioral decisions already answered by the codebase
 
@@ -603,6 +713,8 @@ The real project direction is:
 
 - 3D: add a new first-person presentation on top of the current continuous 2D slice geometry
 - 4D: add a first-person camera presentation on top of the already-existing inhabitable 3D scan volume
+- in both cases, preserve the exact 45 degree continuous slice paradigm rather than approximating it with discrete floors or rooms
+- optionally later: give the original 1D runner an over-the-shoulder rope-in-space POV while still preserving the underlying 1D runner logic
 
 And the safest delivery structure is:
 
