@@ -60,6 +60,8 @@ This means:
 
 ## Milestone 0: Standalone Route Scaffold
 
+Status: complete
+
 ### Goal
 
 Establish the IRL routes as separate entry points with their own bootstraps and basic navigation.
@@ -116,6 +118,8 @@ After this milestone:
 
 ## Milestone 1: 3D Map Load And Core Reuse Boundary
 
+Status: working
+
 ### Goal
 
 Make `run3d.html` load the real 3D maze data using the existing serialization format and define exactly which 3D helpers are reused versus copied.
@@ -150,6 +154,19 @@ Preferred order:
 - `run3d.html?map=...` works as an optional fallback
 - the runtime can report grid size and successful map load status
 - the shared/reused 3D helper boundary is clear in code
+- the browser route includes a visible decode/test surface large enough to use without devtools
+- known-good sample maps can be loaded directly from the page for quick verification
+
+### Current implementation notes
+
+At the current checkpoint, Milestone 1 is effectively in place:
+
+- `run3d.html` decodes `?map3d=` and `?map=`
+- BFS status, grid size, path length, and wall count are reported on-page
+- the page includes built-in sample-map buttons
+- the page no longer depends on the `scan3d.html` bootstrap to validate map decoding
+
+Remaining value from this milestone can be treated as maintenance only if future refactors threaten the clean boundary.
 
 ### Risks
 
@@ -163,6 +180,8 @@ Preferred order:
 - no pointer lock yet
 
 ## Milestone 2: 3D IRL Continuous Slice Embodiment
+
+Status: in progress, first playable pass exists
 
 ### Goal
 
@@ -233,17 +252,37 @@ This milestone must not collapse into:
 - the 3D IRL page renders visible floor geometry from the actual maze
 - the player can move with `WASD`
 - the player can look left/right with the mouse
+- the player can look slightly up/down with a clamped pitch
 - the player cannot walk into void
 - `Q/E` changes the slice and the floor updates
 - slice changes still use stabilization rather than custom teleport behavior
 - `Q/E` changes produce smooth continuous platform morphing, not stepped transitions
 - the IRL view still clearly reads as the same diagonal 45 degree paradigm, only embodied
+- near-miss movement keeps the original nudge/slide feel where possible
+- when slice morphing pinches the player, `Q/E` stops rather than popping to an unrelated legal island
 
 ### Risks
 
 - camera and movement may initially feel mis-scaled
 - if collision helpers are too tightly coupled to scan globals, a small extraction may be needed
 - rendering may be visually correct but hard to read without a horizon, reticle, or slice HUD
+
+### Current implementation notes
+
+At the current checkpoint, the first playable pass already exists:
+
+- the camera is over-shoulder rather than abstract
+- mouse yaw is active
+- mouse pitch is lightly clamped for subtle up/down viewing
+- `WASD` movement is active on the embodied slice-world
+- `Q/E` smoothly morphs the continuous slice
+- completion detection exists and uses a celebratory avatar state rather than freezing all interaction
+
+Known follow-up work still belongs here or in Milestone 3:
+
+- continue tuning movement feel
+- decide whether `WASD` should be allowed to borrow a small amount of invisible-dimension nudge
+- improve readability only where necessary without drifting into a different world model
 
 ### Explicit non-goals
 
@@ -254,6 +293,8 @@ This milestone must not collapse into:
 - no reinterpretation of the maze as stacked discrete levels
 
 ## Milestone 3: 3D IRL Usability Pass
+
+Status: partially started early
 
 ### Goal
 
@@ -286,6 +327,16 @@ Make the 3D IRL route feel intentional rather than prototype-only.
 - the route feels stable enough that 4D implementation can follow the same UX pattern
 - the player can intuitively tell where they are standing on the platform
 - the scene reads spatially without needing heavy realistic lighting
+
+### Current implementation notes
+
+Some Milestone 3 polish has already started because it directly improved playability:
+
+- a thin glowing green locator rod is already present
+- subtle contact shadows are already present
+- the completion state has a lightweight celebratory marker
+
+That is acceptable. The remaining Milestone 3 work should still be deliberate and restrained.
 
 ### Risks
 

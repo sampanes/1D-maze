@@ -42,6 +42,35 @@ function initUi3dRun() {
         sampleBtnLargeLink.addEventListener('click', () => loadMapIntoUrl('map3d', '05C6F7BD7BFFFE84B5AD5EFFFEE16B5A1'));
     }
 
+    const resetPose = () => {
+        if (!run3dState.grid || !run3dState.crossSection) return;
+        reset3dRunPoseFromStart();
+        run3dState.completed = false;
+        const statusBar = document.getElementById('statusBar');
+        if (statusBar) {
+            statusBar.textContent = 'Pose reset to the current slice start.';
+            statusBar.className = 'status-bar neutral';
+        }
+    };
+
+    const centerSlice = () => {
+        if (!run3dState.grid || !run3dState.gridSize) return;
+        run3dState.sliceOffset = getCenterSliceOffset3dRun(run3dState.gridSize);
+        run3dState.crossSection = buildCrossSection3dRun(run3dState.grid, run3dState.sliceOffset, run3dState.bfsPath);
+        resetPose();
+        const statusBar = document.getElementById('statusBar');
+        if (statusBar) {
+            statusBar.textContent = 'Slice recentered and pose reset.';
+            statusBar.className = 'status-bar neutral';
+        }
+    };
+
+    const resetBtn = document.getElementById('btnResetRun3dPose');
+    if (resetBtn) resetBtn.addEventListener('click', resetPose);
+
+    const centerBtn = document.getElementById('btnCenterRun3dSlice');
+    if (centerBtn) centerBtn.addEventListener('click', centerSlice);
+
     const canvas = document.getElementById('run3dOverviewCanvas');
     if (canvas) {
         canvas.addEventListener('click', async () => {
@@ -53,6 +82,13 @@ function initUi3dRun() {
 
     document.addEventListener('pointerlockchange', () => {
         run3dState.pointerLocked = document.pointerLockElement === canvas;
+        const statusBar = document.getElementById('statusBar');
+        if (!statusBar || !run3dState.grid) return;
+        if (run3dState.pointerLocked) {
+            statusBar.textContent = 'Mouse look active. Esc unlocks the cursor.';
+        } else if (!run3dState.completed) {
+            statusBar.textContent = 'IRL 3D ready. Click the view to lock the mouse.';
+        }
     });
 
     document.addEventListener('mousemove', (e) => {
@@ -66,6 +102,16 @@ function initUi3dRun() {
 
     document.addEventListener('keydown', (e) => {
         run3dState.keys[e.code] = true;
+        if (e.code === 'KeyR') {
+            resetPose();
+            e.preventDefault();
+            return;
+        }
+        if (e.code === 'KeyC') {
+            centerSlice();
+            e.preventDefault();
+            return;
+        }
         if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE'].includes(e.code)) e.preventDefault();
     });
 

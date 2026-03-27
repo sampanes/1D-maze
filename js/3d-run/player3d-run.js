@@ -4,6 +4,8 @@ const RUN3D_PLAYER_RADIUS = 0.14;
 const RUN3D_PLAYER_SWEEP_STEP = RUN3D_PLAYER_RADIUS * 0.35;
 const RUN3D_PLAYER_NUDGES = [0, 0.04, -0.04, 0.08, -0.08, 0.12, -0.12];
 const RUN3D_SLICE_SWEEP_STEP = 0.028;
+const RUN3D_CELL_WORLD_SPAN = RUN3D_SQ2;
+const RUN3D_SLICE_SQUEEZE_MAX_DRIFT = RUN3D_CELL_WORLD_SPAN * 0.25;
 
 function pointInRect3dRun(x, y, rect) {
     return x >= rect.x0 + 0.0005 && x <= rect.x1 - 0.0005
@@ -73,13 +75,12 @@ function sweepMove3dRun(dx, dy, cs) {
 }
 
 function stabilizePlayer3dRun(cs, options = {}) {
-    const { allowTeleport = true } = options;
+    const { allowTeleport = true, maxDrift = 1.2 } = options;
     if (canOccupy3dRun(run3dState.player.x, run3dState.player.y, cs)) return true;
 
     const origin = { x: run3dState.player.x, y: run3dState.player.y };
     const step = 0.045;
-    const maxDrift = 1.2;
-    const maxRing = Math.max(12, Math.ceil(maxDrift / step));
+    const maxRing = Math.max(1, Math.ceil(maxDrift / step));
 
     for (let ring = 1; ring <= maxRing; ring++) {
         const candidates = [];
@@ -225,7 +226,10 @@ function moveSlice3dRun(dt) {
 
         const savedX = run3dState.player.x;
         const savedY = run3dState.player.y;
-        if (stabilizePlayer3dRun(candidateCrossSection, { allowTeleport: false })) {
+        if (stabilizePlayer3dRun(candidateCrossSection, {
+            allowTeleport: false,
+            maxDrift: RUN3D_SLICE_SQUEEZE_MAX_DRIFT,
+        })) {
             run3dState.sliceOffset = candidateSlice;
             run3dState.crossSection = candidateCrossSection;
             changed = true;

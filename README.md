@@ -48,9 +48,48 @@ Check it out here before I decide to refactor the whole thing and break it:
 ---
 *Created by a tired developer who probably should have been debugging something else.*
 
+## IRL Routes
+
+There is now a separate experimental IRL route structure being built in parallel to the existing scan pages so the original modes stay stable.
+
+Current dedicated routes:
+
+- `run3d.html`
+- `run4d.html`
+
+Current intent:
+
+- `run3d.html` should let you inhabit the same 45 degree continuously morphing 3D slice-world instead of replacing it with discrete floors
+- `run4d.html` will do the same for the current 4D inhabited scan volume
+
+Important design rule:
+
+- these IRL routes are not supposed to reinterpret the mazes as ordinary room-based or stacked-layer games
+- they are supposed to put the camera inside the same continuously deforming slice logic the scan modes already use
+
+Current state of `run3d.html`:
+
+- decodes existing `?map3d=` links
+- also supports `?map=` as a fallback
+- includes a browser-side decode/BFS verification surface
+- includes a first playable pass of the embodied 3D route
+
+Example URLs once hosted:
+
+- `run3d.html?map3d=03492ED42`
+- `run3d.html?map=03492ED42`
+
+The existing pages still remain the canonical stable routes:
+
+- `index.html`
+- `scan3d.html`
+- `scan4d.html`
+
 ## Bunch of links dumped here
 
 * [Squiggly 12](https://sampanes.github.io/1D-maze/index.html?map=0C4F840A5EA50A57A5025FE4207AF6286AA0A2) - One I drew to be as turny as I could get with 12x12
 * [Slightly bigger](https://sampanes.github.io/1D-maze/index.html?map=1020402240AF1C21F67D042145B0643FF6702423AC0E241834106417C414461102) - Pretty mean tbh but not impossible.
 * [3x3x3 NOICE](https://sampanes.github.io/1D-maze/scan3d.html?map3d=03492ED42) - Quite nice now that 3D is implemented
 * [5x5x5 LOOPY](https://sampanes.github.io/1D-maze/scan3d.html?map3d=05C6F7BD7BFFFE84B5AD5EFFFEE16B5A1) - Pretty proud of this one but better is possible
+* [3x3x3 NOICE IRL Route](https://sampanes.github.io/1D-maze/run3d.html?map3d=03492ED42) - Experimental embodied route using the same map data
+* [5x5x5 LOOPY IRL Route](https://sampanes.github.io/1D-maze/run3d.html?map3d=05C6F7BD7BFFFE84B5AD5EFFFEE16B5A1) - Experimental embodied route on the larger sample

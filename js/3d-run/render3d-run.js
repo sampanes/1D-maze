@@ -43,7 +43,7 @@ function render3dRunMetrics() {
     );
     setText(
         'run3dOverviewCaption',
-        'Continuous 45 degree slice-world view. White = path platform, gold = BFS hint, green/red = anchors. Q/E smoothly morphs the slice.'
+        'Continuous 45 degree slice-world view. White = path platform, gold = BFS hint, green/red = anchors. Q/E smoothly morphs the slice. R resets pose.'
     );
     updateChecklist();
 }
@@ -298,19 +298,34 @@ function render3dRunOverview() {
         ctx.restore();
     }
 
-    ctx.fillStyle = 'rgba(6,10,18,0.78)';
-    ctx.fillRect(18, 18, 330, 92);
+    ctx.fillStyle = 'rgba(6,10,18,0.8)';
+    ctx.fillRect(18, 18, 364, 114);
     ctx.strokeStyle = 'rgba(122,252,255,0.14)';
-    ctx.strokeRect(18, 18, 330, 92);
+    ctx.strokeRect(18, 18, 364, 114);
     ctx.fillStyle = '#e8f5ff';
     ctx.font = '700 14px system-ui';
     ctx.textAlign = 'left';
     ctx.fillText('Continuous Slice Embodiment', 32, 42);
     ctx.font = '13px system-ui';
     ctx.fillStyle = '#9db1d8';
-    ctx.fillText(`S ${run3dState.sliceOffset.toFixed(2)}  |  yaw ${(run3dState.yaw * 180 / Math.PI).toFixed(1)}°`, 32, 64);
-    ctx.fillText(`pitch ${(run3dState.pitch * 180 / Math.PI).toFixed(1)}°  |  WASD move  |  Q/E morph slice`, 32, 84);
-    ctx.fillText('Click the view to lock mouse', 32, 102);
+    ctx.fillText(`S ${run3dState.sliceOffset.toFixed(2)}  |  yaw ${(run3dState.yaw * 180 / Math.PI).toFixed(1)} deg`, 32, 64);
+    ctx.fillText(`pitch ${(run3dState.pitch * 180 / Math.PI).toFixed(1)} deg  |  ${run3dState.pointerLocked ? 'mouse look active' : 'click to lock mouse'}`, 32, 84);
+    ctx.fillText('WASD move  |  Q/E morph slice  |  R reset pose  |  Esc unlock', 32, 104);
+
+    const mapLabel = run3dState.mapSource ? `${run3dState.mapSource}` : 'no map';
+    const lockLabel = run3dState.pointerLocked ? 'locked' : 'free cursor';
+    const badgeX = canvas.width - 228;
+    ctx.fillStyle = 'rgba(6,10,18,0.7)';
+    ctx.fillRect(badgeX, 18, 210, 58);
+    ctx.strokeStyle = 'rgba(122,252,255,0.14)';
+    ctx.strokeRect(badgeX, 18, 210, 58);
+    ctx.fillStyle = '#7afcff';
+    ctx.font = '700 12px system-ui';
+    ctx.fillText('Route State', badgeX + 14, 38);
+    ctx.fillStyle = '#d7e4ff';
+    ctx.font = '12px system-ui';
+    ctx.fillText(`map: ${mapLabel}`, badgeX + 14, 56);
+    ctx.fillText(`cursor: ${lockLabel}`, badgeX + 14, 72);
 
     if (run3dState.completed) {
         ctx.fillStyle = 'rgba(93,255,176,0.12)';
@@ -325,11 +340,12 @@ function render3dRunOverview() {
 
     if (!run3dState.pointerLocked) {
         ctx.fillStyle = 'rgba(255,255,255,0.05)';
-        ctx.fillRect(canvas.width * 0.5 - 150, canvas.height - 58, 300, 32);
+        ctx.fillRect(canvas.width * 0.5 - 194, canvas.height - 66, 388, 42);
         ctx.fillStyle = '#dff5ff';
         ctx.textAlign = 'center';
         ctx.font = '600 13px system-ui';
-        ctx.fillText('Click in the view to enable over-shoulder mouse look', canvas.width * 0.5, canvas.height - 37);
+        ctx.fillText('Click in the view to enable over-shoulder mouse look', canvas.width * 0.5, canvas.height - 46);
+        ctx.fillText('Then use WASD to move, Q/E to morph, R to reset, Esc to unlock', canvas.width * 0.5, canvas.height - 29);
     } else {
         ctx.strokeStyle = 'rgba(122,252,255,0.8)';
         ctx.beginPath();
@@ -389,4 +405,5 @@ function reset3dRunPoseFromStart() {
     run3dState.player.x = (start.x0 + start.x1) * 0.5;
     run3dState.player.y = (start.y0 + start.y1) * 0.5;
     run3dState.yaw = 0;
+    run3dState.pitch = -0.14;
 }

@@ -69,8 +69,8 @@
       gap:14px;
     ">
       <div>
-        <div style="color:#7afcff; font-size:0.78rem; font-weight:800; letter-spacing:0.14em; text-transform:uppercase;">Milestone 1</div>
-        <h2 style="margin:8px 0 10px; color:#f2f5ff; font-size:1.45rem; line-height:1.15;">3D Map Decode Test Surface</h2>
+        <div style="color:#7afcff; font-size:0.78rem; font-weight:800; letter-spacing:0.14em; text-transform:uppercase;">Milestone 3</div>
+        <h2 style="margin:8px 0 10px; color:#f2f5ff; font-size:1.45rem; line-height:1.15;">3D IRL Usability Pass</h2>
         <p id="run3dSummary" style="margin:0; color:#9db1d8; line-height:1.55;">Waiting for initialization.</p>
       </div>
 
@@ -97,6 +97,21 @@
         <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Load Source</div>
         <div id="run3dMapSource" style="margin-top:8px; color:#d7e4ff; font-weight:700; line-height:1.45;">No URL parameter found.</div>
         <div id="run3dMapMeta" style="margin-top:10px; color:#9db1d8; font-size:0.92rem; line-height:1.5;">Open this page with `?map3d=...` or `?map=...` to run the decode test.</div>
+      </div>
+
+      <div style="padding:14px 14px 12px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);">
+        <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Run Controls</div>
+        <div style="margin-top:8px; color:#d7e4ff; line-height:1.55;">
+          <div><strong>Move:</strong> `WASD`</div>
+          <div><strong>Look:</strong> click to lock mouse, then move mouse</div>
+          <div><strong>Morph slice:</strong> `Q / E`</div>
+          <div><strong>Reset pose:</strong> `R` or button below</div>
+          <div><strong>Unlock mouse:</strong> `Esc`</div>
+        </div>
+        <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+          <button id="btnResetRun3dPose" class="btn-scan">Reset Pose</button>
+          <button id="btnCenterRun3dSlice" class="btn-validate">Center Slice</button>
+        </div>
       </div>
 
       <div style="padding:14px 14px 12px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);">
