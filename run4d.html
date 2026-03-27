@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diamond Maze IRL 4D</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/game.css">
+</head>
+<body>
+  <div class="header">
+    <h1>Diamond Maze IRL 4D</h1>
+    <p>Standalone first-person scaffold for 4D IRL mode. Existing hyper-scan mode remains untouched.</p>
+    <div class="header-nav-links">
+      <a href="scan4d.html" style="
+        display: inline-block;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #7afcff;
+        border: 1px solid rgba(122,252,255,0.28);
+        border-radius: 999px;
+        padding: 4px 12px;
+        text-decoration: none;
+        letter-spacing: 0.03em;
+      ">Back To 4D Scan</a>
+      <a href="run3d.html" style="
+        display: inline-block;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #7afcff;
+        border: 1px solid rgba(122,252,255,0.28);
+        border-radius: 999px;
+        padding: 4px 12px;
+        text-decoration: none;
+        letter-spacing: 0.03em;
+        margin-left: 6px;
+      ">3D IRL</a>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="btnOpenScan4d" class="btn-back">Back To 4D Scan</button>
+  </div>
+
+  <div id="statusBar" class="status-bar neutral">IRL 4D scaffold loaded.</div>
+
+  <div class="maze-section">
+    <div class="canvas-wrapper" style="display:block; max-width: 920px;">
+      <div style="
+        min-height: 320px;
+        border-radius: 12px;
+        background:
+          radial-gradient(circle at top, rgba(255,255,255,0.08), rgba(255,255,255,0.01) 35%, rgba(0,0,0,0.0) 60%),
+          linear-gradient(180deg, #05070b 0%, #020304 100%);
+        border: 1px solid rgba(122,252,255,0.12);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02), 0 18px 45px rgba(0,0,0,0.35);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px;
+        text-align: center;
+      ">
+        <div>
+          <h2 style="margin:0 0 12px; color:#f2f5ff; font-size:1.35rem; font-weight:800;">4D IRL Route Is Live</h2>
+          <p id="run4dSummary" style="margin:0; color:#9db1d8;">Waiting for initialization.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/4d-run/state4d-run.js"></script>
+  <script src="js/4d-run/player4d-run.js"></script>
+  <script src="js/4d-run/render4d-run.js"></script>
+  <script src="js/4d-run/ui4d-run.js"></script>
+  <script src="js/4d-run/init4d-run.js"></script>
+</body>
+</html>
