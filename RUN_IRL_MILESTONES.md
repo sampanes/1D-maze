@@ -454,6 +454,9 @@ Do not make pitch alter horizontal movement direction. Horizontal movement shoul
 - the player stays constrained by the existing 4D legality rules
 - `Q/E` produces smooth continuous world morphing, not discrete hyper-layer jumps
 - the route still feels like the same original scan paradigm, just from inside
+- passable space reads as air rather than ghost-solid cubes
+- faces between adjacent passable regions are not rendered
+- only exposed boundary faces remain visible so the space reads as halls, shafts, floors, ceilings, and walls
 
 ### Risks
 
@@ -490,12 +493,18 @@ Make the 4D IRL route readable and comfortable enough to use for real exploratio
 - reticle
 - clearer start/end indicators
 - subtle visual feedback when shifting the 4th dimension
+- stronger surface semantics so exposed faces read differently as floors, ceilings, walls, or open edges
+- preserve visibility into passable volume by treating non-boundary interior faces as fully absent rather than translucent
+- default opaque surface rendering so the current local space reads like a real place
+- hold `LMB` for temporary x-ray mode so the player can inspect upcoming geometry without permanently losing spatial clarity
 
 ### Done means
 
 - the player can understand how to control the route without reading code
 - the hyper-shift mechanic is clearly visible
 - the route feels immersive rather than merely functional
+- the player can visually read where open air is versus where actual blocking surfaces are
+- temporary x-ray behaves like a deliberate inspection aid rather than the default navigation mode
 
 ### Risks
 

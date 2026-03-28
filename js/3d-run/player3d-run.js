@@ -6,6 +6,7 @@ const RUN3D_PLAYER_NUDGES = [0, 0.04, -0.04, 0.08, -0.08, 0.12, -0.12];
 const RUN3D_SLICE_SWEEP_STEP = 0.028;
 const RUN3D_CELL_WORLD_SPAN = RUN3D_SQ2;
 const RUN3D_SLICE_SQUEEZE_MAX_DRIFT = RUN3D_CELL_WORLD_SPAN * 0.25;
+const RUN3D_DEFAULT_PITCH = -25 * Math.PI / 180;
 
 function pointInRect3dRun(x, y, rect) {
     return x >= rect.x0 + 0.0005 && x <= rect.x1 - 0.0005
@@ -75,7 +76,7 @@ function sweepMove3dRun(dx, dy, cs) {
 }
 
 function stabilizePlayer3dRun(cs, options = {}) {
-    const { allowTeleport = true, maxDrift = 1.2 } = options;
+    const { allowTeleport = true, maxDrift = 1.2, axisOnly = false } = options;
     if (canOccupy3dRun(run3dState.player.x, run3dState.player.y, cs)) return true;
 
     const origin = { x: run3dState.player.x, y: run3dState.player.y };
@@ -84,8 +85,12 @@ function stabilizePlayer3dRun(cs, options = {}) {
 
     for (let ring = 1; ring <= maxRing; ring++) {
         const candidates = [];
-        for (let ox = -ring; ox <= ring; ox++) candidates.push([ox, -ring], [ox, ring]);
-        for (let oy = -ring + 1; oy <= ring - 1; oy++) candidates.push([-ring, oy], [ring, oy]);
+        if (axisOnly) {
+            candidates.push([0, -ring], [0, ring], [-ring, 0], [ring, 0]);
+        } else {
+            for (let ox = -ring; ox <= ring; ox++) candidates.push([ox, -ring], [ox, ring]);
+            for (let oy = -ring + 1; oy <= ring - 1; oy++) candidates.push([-ring, oy], [ring, oy]);
+        }
         candidates.sort((a, b) => Math.hypot(a[0], a[1]) - Math.hypot(b[0], b[1]));
 
         for (const [ox, oy] of candidates) {
@@ -229,6 +234,7 @@ function moveSlice3dRun(dt) {
         if (stabilizePlayer3dRun(candidateCrossSection, {
             allowTeleport: false,
             maxDrift: RUN3D_SLICE_SQUEEZE_MAX_DRIFT,
+            axisOnly: true,
         })) {
             run3dState.sliceOffset = candidateSlice;
             run3dState.crossSection = candidateCrossSection;
@@ -259,7 +265,7 @@ function initPlayer3dRun() {
         run3dState.player.y = (startRect.y0 + startRect.y1) * 0.5;
     }
     run3dState.yaw = 0;
-    run3dState.pitch = -0.14;
+    run3dState.pitch = RUN3D_DEFAULT_PITCH;
     run3dState.completed = false;
     return true;
 }

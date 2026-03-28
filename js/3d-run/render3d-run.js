@@ -405,5 +405,5 @@ function reset3dRunPoseFromStart() {
     run3dState.player.x = (start.x0 + start.x1) * 0.5;
     run3dState.player.y = (start.y0 + start.y1) * 0.5;
     run3dState.yaw = 0;
-    run3dState.pitch = -0.14;
+    run3dState.pitch = -25 * Math.PI / 180;
 }

@@ -8,10 +8,13 @@
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/game.css">
 </head>
-<body>
+<body style="min-height:100vh; background:
+  radial-gradient(circle at top, rgba(122,252,255,0.10), rgba(122,252,255,0.00) 30%),
+  linear-gradient(180deg, #09101a 0%, #04070d 55%, #020304 100%);
+">
   <div class="header">
     <h1>Diamond Maze IRL 4D</h1>
-    <p>Standalone first-person scaffold for 4D IRL mode. Existing hyper-scan mode remains untouched.</p>
+    <p>Standalone first-person route for the 4D maze. This page now verifies real shared `map4d` loading and preserves the same continuous hyper-slice paradigm the future IRL camera will inhabit.</p>
     <div class="header-nav-links">
       <a href="scan4d.html" style="
         display: inline-block;
@@ -41,34 +44,127 @@
 
   <div class="controls">
     <button id="btnOpenScan4d" class="btn-back">Back To 4D Scan</button>
+    <button id="btnCenterRun4dSlice" class="btn-validate">Center Hyper-Slice</button>
+    <button id="btnResetRun4dPose" class="btn-scan">Reset Pose</button>
   </div>
 
-  <div id="statusBar" class="status-bar neutral">IRL 4D scaffold loaded.</div>
+  <div id="statusBar" class="status-bar neutral" style="max-width:min(1400px, 94vw); margin:0 auto 18px;">IRL 4D scaffold loaded.</div>
 
-  <div class="maze-section">
-    <div class="canvas-wrapper" style="display:block; max-width: 920px;">
-      <div style="
-        min-height: 320px;
-        border-radius: 12px;
-        background:
-          radial-gradient(circle at top, rgba(255,255,255,0.08), rgba(255,255,255,0.01) 35%, rgba(0,0,0,0.0) 60%),
-          linear-gradient(180deg, #05070b 0%, #020304 100%);
-        border: 1px solid rgba(122,252,255,0.12);
-        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02), 0 18px 45px rgba(0,0,0,0.35);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 32px;
-        text-align: center;
-      ">
-        <div>
-          <h2 style="margin:0 0 12px; color:#f2f5ff; font-size:1.35rem; font-weight:800;">4D IRL Route Is Live</h2>
-          <p id="run4dSummary" style="margin:0; color:#9db1d8;">Waiting for initialization.</p>
+  <main style="
+    width:min(1400px, 94vw);
+    margin:0 auto 28px;
+    display:grid;
+    grid-template-columns:minmax(280px, 360px) minmax(0, 1fr);
+    gap:18px;
+    align-items:stretch;
+  ">
+    <section style="
+      border-radius:18px;
+      border:1px solid rgba(122,252,255,0.14);
+      background:linear-gradient(180deg, rgba(10,16,28,0.94), rgba(6,10,18,0.96));
+      box-shadow:0 26px 60px rgba(0,0,0,0.28);
+      padding:20px 18px;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    ">
+      <div>
+        <div style="color:#7afcff; font-size:0.78rem; font-weight:800; letter-spacing:0.14em; text-transform:uppercase;">Milestone 5</div>
+        <h2 style="margin:8px 0 10px; color:#f2f5ff; font-size:1.45rem; line-height:1.15;">4D First-Person Traversal</h2>
+        <p id="run4dSummary" style="margin:0; color:#9db1d8; line-height:1.55;">Waiting for initialization.</p>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px;">
+        <div style="padding:12px 12px 10px; border-radius:14px; background:rgba(122,252,255,0.05); border:1px solid rgba(122,252,255,0.10);">
+          <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Grid Size</div>
+          <div id="run4dGridSize" style="margin-top:6px; color:#f2f5ff; font-size:1.2rem; font-weight:800;">--</div>
+        </div>
+        <div style="padding:12px 12px 10px; border-radius:14px; background:rgba(122,252,255,0.05); border:1px solid rgba(122,252,255,0.10);">
+          <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Walkability</div>
+          <div id="run4dSolvable" style="margin-top:6px; color:#f2f5ff; font-size:1.25rem; font-weight:800;">Awaiting map</div>
+        </div>
+        <div style="padding:12px 12px 10px; border-radius:14px; background:rgba(122,252,255,0.05); border:1px solid rgba(122,252,255,0.10);">
+          <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Cells</div>
+          <div id="run4dCellCount" style="margin-top:6px; color:#f2f5ff; font-size:1.2rem; font-weight:800;">--</div>
+        </div>
+        <div style="padding:12px 12px 10px; border-radius:14px; background:rgba(122,252,255,0.05); border:1px solid rgba(122,252,255,0.10);">
+          <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Path Length</div>
+          <div id="run4dPathLength" style="margin-top:6px; color:#f2f5ff; font-size:1.2rem; font-weight:800;">--</div>
         </div>
       </div>
-    </div>
-  </div>
 
+      <div style="padding:14px 14px 12px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);">
+        <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Load Source</div>
+        <div id="run4dMapSource" style="margin-top:8px; color:#d7e4ff; font-weight:700; line-height:1.45;">No URL parameter found.</div>
+        <div id="run4dMapMeta" style="margin-top:10px; color:#9db1d8; font-size:0.92rem; line-height:1.5;">Open this page with `?map4d=...` to run the decode test.</div>
+      </div>
+
+      <div style="padding:14px 14px 12px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);">
+        <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Run Controls</div>
+        <div style="margin-top:8px; color:#d7e4ff; line-height:1.55;">
+          <div><strong>Move:</strong> `WASD`</div>
+          <div><strong>Look:</strong> click to lock mouse, then move mouse</div>
+          <div><strong>Rise / Lower:</strong> `Space / Shift`</div>
+          <div><strong>Shift 4D:</strong> `Q / E`</div>
+          <div><strong>Reset pose:</strong> `R` or button above</div>
+          <div><strong>Unlock mouse:</strong> `Esc`</div>
+        </div>
+      </div>
+
+      <div style="padding:14px 14px 12px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);">
+        <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Milestone 5 Browser Test</div>
+        <ul style="margin:10px 0 0; padding-left:18px; color:#d7e4ff; line-height:1.55;">
+          <li id="run4dCheckBoot">Page boots with no URL map and no console errors.</li>
+          <li id="run4dCheckMap4d">`?map4d=` decodes and reports grid/path metadata.</li>
+          <li id="run4dCheckOverview">The preview canvas below visibly reflects the reconstructed 4D hyper-slice.</li>
+        </ul>
+      </div>
+
+      <div style="padding:14px 14px 12px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);">
+        <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Milestone Boundary</div>
+        <div style="margin-top:8px; color:#d7e4ff; line-height:1.55;">
+          This route now inhabits the same 4D hyper-slice world instead of leaving it in editor view. The map format and continuous slice logic stay the same; only the controls and camera have changed.
+        </div>
+      </div>
+    </section>
+
+    <section style="
+      border-radius:20px;
+      border:1px solid rgba(122,252,255,0.14);
+      background:
+        radial-gradient(circle at top, rgba(122,252,255,0.08), rgba(122,252,255,0.01) 34%, rgba(0,0,0,0) 60%),
+        linear-gradient(180deg, rgba(9,14,25,0.96), rgba(4,6,10,0.98));
+      box-shadow:0 30px 70px rgba(0,0,0,0.34);
+      padding:18px;
+      min-height:72vh;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    ">
+      <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+        <div>
+          <div style="color:#7afcff; font-size:0.78rem; font-weight:800; letter-spacing:0.12em; text-transform:uppercase;">Decoded Hyper-Slice</div>
+          <h2 style="margin:8px 0 0; color:#f2f5ff; font-size:1.4rem; line-height:1.15;">Embodied View</h2>
+        </div>
+        <div id="run4dOverviewCaption" style="color:#9db1d8; font-size:0.92rem;">No map loaded yet.</div>
+      </div>
+
+      <div style="
+        flex:1 1 auto;
+        min-height:480px;
+        border-radius:16px;
+        overflow:hidden;
+        border:1px solid rgba(255,255,255,0.05);
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)),
+          linear-gradient(180deg, #060912 0%, #04070c 100%);
+      ">
+        <canvas id="run4dOverviewCanvas" width="1100" height="760" style="width:100%; height:100%; display:block;"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/4d-run/map4d-run-core.js"></script>
   <script src="js/4d-run/state4d-run.js"></script>
   <script src="js/4d-run/player4d-run.js"></script>
   <script src="js/4d-run/render4d-run.js"></script>
