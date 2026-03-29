@@ -528,6 +528,8 @@ Make the 4D IRL route readable and comfortable enough to use for real exploratio
 - current coordinates readout
 - reticle
 - clearer start/end indicators
+- make the red finish geometry read like a real boundary to cross rather than just another colored surface
+- make completion feel more final with a stronger finish-state animation/treatment instead of only a narrow status banner
 - subtle visual feedback when shifting the 4th dimension
 - stronger surface semantics so exposed faces read differently as floors, ceilings, walls, or open edges
 - preserve visibility into passable volume by treating non-boundary interior faces as fully absent rather than translucent
@@ -560,11 +562,17 @@ Some Milestone 6 work has already started because it materially improved navigat
 - the in-canvas HUD now shows current pose data more clearly
 - transient hyper-shift feedback now appears while `Q/E` is actively morphing the 4th dimension
 - the route presentation itself now labels this work as Milestone 6 rather than treating it as a hidden follow-up
+- the sidebar now exposes live route state such as pointer-lock state, view mode, completion, and player position
+- the route now explains spatial interpretation more explicitly so x-ray remains a deliberate inspection tool rather than a crutch
+- finish-line readability is now an explicit usability concern rather than an optional flourish
+- the red finish now has a stronger boundary-like treatment so it reads more like a threshold to cross than a generic colored surface
+- the finish boundary treatment now persists on pass-through faces too, so hall-facing finish planes still read as something to cross
 
 The remaining work here should stay narrow:
 
 - tighten close-camera polish
 - improve immersion/readability
+- make the finish state feel visually definitive without changing win detection
 - avoid turning usability work into a major renderer rewrite
 
 ## Milestone 7: Sharing Cleanup

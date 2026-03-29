@@ -84,6 +84,9 @@ Current state of `run4d.html`:
 - defaults to more opaque surfaces for navigation readability
 - lets you hold `LMB` for temporary x-ray inspection
 - now includes stronger in-view HUD/readability feedback while shifting through the 4th dimension
+- now includes live route-state readouts so you can tell pointer-lock state, current view mode, and current position without guesswork
+- now treats the red finish more like a visible boundary/threshold to cross instead of only a flat colored endpoint
+- finish-boundary lines can now persist even on hall-facing pass-through finish faces, so the goal reads more like crossing glowing planes than touching a red block
 
 Route handoff behavior:
 

@@ -113,6 +113,23 @@
       </div>
 
       <div style="padding:14px 14px 12px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);">
+        <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Live Route State</div>
+        <div style="margin-top:8px; color:#d7e4ff; line-height:1.55;">
+          <div><strong>Pointer:</strong> <span id="run4dPointerState">Awaiting map</span></div>
+          <div><strong>View Mode:</strong> <span id="run4dViewMode">Opaque nav</span></div>
+          <div><strong>Completion:</strong> <span id="run4dCompletionState">Not reached</span></div>
+          <div><strong>Position:</strong> <span id="run4dPlayerPos">--</span></div>
+        </div>
+      </div>
+
+      <div style="padding:14px 14px 12px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);">
+        <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Spatial Read</div>
+        <div id="run4dReadHint" style="margin-top:8px; color:#d7e4ff; line-height:1.55;">
+          White surfaces are your immediate local structure. Dark space is void. Hold `LMB` when you need a temporary x-ray peek into upcoming geometry.
+        </div>
+      </div>
+
+      <div style="padding:14px 14px 12px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);">
         <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Milestone 6 Browser Test</div>
         <ul style="margin:10px 0 0; padding-left:18px; color:#d7e4ff; line-height:1.55;">
           <li id="run4dCheckBoot">Page boots with no URL map and no console errors.</li>

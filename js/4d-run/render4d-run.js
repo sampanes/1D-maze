@@ -26,6 +26,11 @@ function render4dRunMetrics() {
         setText('run4dMapSource', 'No URL parameter found.');
         setText('run4dMapMeta', 'Open this page with `?map4d=...` to run the route.');
         setText('run4dOverviewCaption', 'No map loaded yet.');
+        setText('run4dPointerState', 'Awaiting map');
+        setText('run4dViewMode', 'Opaque nav');
+        setText('run4dCompletionState', 'Not reached');
+        setText('run4dPlayerPos', '--');
+        setText('run4dReadHint', 'White surfaces are your immediate local structure. Dark space is void. Hold `LMB` when you need a temporary x-ray peek into upcoming geometry.');
         updateChecklist4dRun();
         return;
     }
@@ -44,6 +49,16 @@ function render4dRunMetrics() {
     setText(
         'run4dOverviewCaption',
         'First-person route through the current 4D hyper-slice. White = walkable space, gold = BFS hint, green/red = anchors.'
+    );
+    setText('run4dPointerState', run4dState.pointerLocked ? 'Mouse look active' : 'Click view to lock');
+    setText('run4dViewMode', run4dState.xrayHeld ? 'X-ray held' : 'Opaque nav');
+    setText('run4dCompletionState', run4dState.completed ? 'Finish reached' : 'Not reached');
+    setText('run4dPlayerPos', `(${run4dState.player.x.toFixed(2)}, ${run4dState.player.y.toFixed(2)}, ${run4dState.player.z.toFixed(2)})`);
+    setText(
+        'run4dReadHint',
+        run4dState.xrayHeld
+            ? 'X-ray is temporarily active. Use it to inspect upcoming halls, shafts, and slice changes, then release to return to solid local navigation.'
+            : 'White surfaces are your immediate local structure. Dark space is void. Hold `LMB` only when you need to peek through future geometry.'
     );
     updateChecklist4dRun();
 }
@@ -250,6 +265,53 @@ function drawQuad4dRun(ctx, quad, fillStyle, strokeStyle) {
     }
 }
 
+function drawFinishFrame4dRun(ctx, quad, color, glowColor) {
+    if (!quad || quad.length < 3) return;
+    const cx = quad.reduce((sum, p) => sum + p.x, 0) / quad.length;
+    const cy = quad.reduce((sum, p) => sum + p.y, 0) / quad.length;
+    const inset = 0.14;
+    const inner = quad.map((p) => ({
+        x: p.x + (cx - p.x) * inset,
+        y: p.y + (cy - p.y) * inset,
+    }));
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(inner[0].x, inner[0].y);
+    for (let i = 1; i < inner.length; i++) ctx.lineTo(inner[i].x, inner[i].y);
+    ctx.closePath();
+    ctx.strokeStyle = glowColor;
+    ctx.lineWidth = 8;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(inner[0].x, inner[0].y);
+    for (let i = 1; i < inner.length; i++) ctx.lineTo(inner[i].x, inner[i].y);
+    ctx.closePath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawFinishStripes4dRun(ctx, quad, color) {
+    if (!quad || quad.length !== 4) return;
+    const lerp = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+    const stripeTs = [0.24, 0.5, 0.76];
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    for (const t of stripeTs) {
+        const p0 = lerp(quad[0], quad[1], t);
+        const p1 = lerp(quad[3], quad[2], t);
+        ctx.beginPath();
+        ctx.moveTo(p0.x, p0.y);
+        ctx.lineTo(p1.x, p1.y);
+        ctx.stroke();
+    }
+    ctx.restore();
+}
+
 function drawRoundedHud4dRun(ctx, x, y, w, h, fill, stroke) {
     const r = 14;
     ctx.beginPath();
@@ -337,7 +399,7 @@ function render4dRunOverview() {
                 y: face.center.y + face.normal.y * 0.02,
                 z: face.center.z + face.normal.z * 0.02,
             };
-            if (pointPassableRender4dRun(sample.x, sample.y, sample.z, run4dState.crossSection)) continue;
+            const passThroughFace = pointPassableRender4dRun(sample.x, sample.y, sample.z, run4dState.crossSection);
 
             const centerDx = face.center.x - camera.pos.x;
             const centerDy = face.center.y - camera.pos.y;
@@ -356,7 +418,17 @@ function render4dRunOverview() {
             } else if (face.normal.z < -0.5) {
                 fill = palette.floor;
             }
-            drawables.push({ projected, avgDepth, maxDepth, fill, edge });
+            if (passThroughFace && !palette.finishThrough) continue;
+            drawables.push({
+                projected,
+                avgDepth,
+                maxDepth,
+                fill: passThroughFace ? null : fill,
+                edge: passThroughFace ? null : edge,
+                finishFrame: !!palette.finishFrame,
+                finishStripe: !!palette.finishStripe,
+                finishThrough: !!passThroughFace && !!palette.finishThrough,
+            });
         }
     };
 
@@ -387,6 +459,9 @@ function render4dRunOverview() {
         wall: withAlpha4dRun('rgba(150,58,58,0.42)', alphaProfile.wall),
         ceiling: withAlpha4dRun('rgba(126,44,44,0.24)', alphaProfile.ceiling),
         edge: withAlpha4dRun('rgba(84,28,28,0.44)', alphaProfile.edge),
+        finishFrame: true,
+        finishStripe: true,
+        finishThrough: true,
     };
 
     const pathSet = new Set(run4dState.crossSection.pathBoxes.map((box) => `${box.x0}|${box.x1}|${box.y0}|${box.y1}|${box.z0}|${box.z1}`));
@@ -399,7 +474,18 @@ function render4dRunOverview() {
 
     drawables.sort((a, b) => (b.maxDepth - a.maxDepth) || (b.avgDepth - a.avgDepth));
     for (const item of drawables) {
-        drawQuad4dRun(ctx, item.projected, item.fill, item.edge);
+        if (item.fill) drawQuad4dRun(ctx, item.projected, item.fill, item.edge);
+        if (item.finishFrame) {
+            drawFinishFrame4dRun(
+                ctx,
+                item.projected,
+                item.finishThrough ? 'rgba(255,236,176,0.98)' : 'rgba(255,242,199,0.95)',
+                item.finishThrough ? 'rgba(255,210,120,0.26)' : 'rgba(255,120,120,0.22)'
+            );
+        }
+        if (item.finishStripe) {
+            drawFinishStripes4dRun(ctx, item.projected, item.finishThrough ? 'rgba(255,226,150,0.82)' : 'rgba(255,232,184,0.68)');
+        }
     }
 
     ctx.fillStyle = vignette;
@@ -465,14 +551,19 @@ function render4dRunOverview() {
     }
 
     if (run4dState.completed) {
-        ctx.fillStyle = 'rgba(93,255,176,0.12)';
-        ctx.fillRect(canvas.width * 0.5 - 180, 24, 360, 48);
-        ctx.strokeStyle = 'rgba(93,255,176,0.42)';
-        ctx.strokeRect(canvas.width * 0.5 - 180, 24, 360, 48);
+        drawRoundedHud4dRun(
+            ctx,
+            canvas.width * 0.5 - 254,
+            22,
+            508,
+            58,
+            'rgba(93,255,176,0.12)',
+            'rgba(93,255,176,0.42)'
+        );
         ctx.fillStyle = '#dfffee';
         ctx.textAlign = 'center';
         ctx.font = '800 18px system-ui';
-        ctx.fillText('Hyper-slice complete: reached the red finish.', canvas.width * 0.5, 54);
+        ctx.fillText('Hyper-slice complete: crossed the finish boundary.', canvas.width * 0.5, 58);
     }
 
     if (!run4dState.pointerLocked) {
