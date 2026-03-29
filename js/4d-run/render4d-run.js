@@ -133,6 +133,23 @@ function clipPolygonToNearPlane4dRun(points, nearZ) {
     return clipped;
 }
 
+function expandProjectedFace4dRun(projected) {
+    if (!projected || projected.length < 3) return projected;
+    const cx = projected.reduce((sum, p) => sum + p.x, 0) / projected.length;
+    const cy = projected.reduce((sum, p) => sum + p.y, 0) / projected.length;
+    return projected.map((point) => {
+        const dx = point.x - cx;
+        const dy = point.y - cy;
+        const len = Math.hypot(dx, dy) || 1;
+        const pad = Math.min(1.25, 0.55 + 8 / (len + 12));
+        return {
+            x: point.x + (dx / len) * pad,
+            y: point.y + (dy / len) * pad,
+            depth: point.depth,
+        };
+    });
+}
+
 function projectClippedFace4dRun(faceQuad, camera, canvas) {
     const nearZ = 0.02;
     const cameraPoints = faceQuad
@@ -166,7 +183,7 @@ function projectClippedFace4dRun(faceQuad, camera, canvas) {
     const areaLike = width * height;
     if ((width < 1.5 || height < 1.5) && areaLike < 24) return null;
 
-    return projected;
+    return expandProjectedFace4dRun(projected);
 }
 
 function buildCamera4dRun() {

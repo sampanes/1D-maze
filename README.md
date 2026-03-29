@@ -115,3 +115,4 @@ The existing pages still remain the canonical stable routes:
 * [5x5x5 LOOPY](https://sampanes.github.io/1D-maze/scan3d.html?map3d=05C6F7BD7BFFFE84B5AD5EFFFEE16B5A1) - Pretty proud of this one but better is possible
 * [3x3x3 NOICE IRL Route](https://sampanes.github.io/1D-maze/run3d.html?map3d=03492ED42) - Experimental embodied route using the same map data
 * [5x5x5 LOOPY IRL Route](https://sampanes.github.io/1D-maze/run3d.html?map3d=05C6F7BD7BFFFE84B5AD5EFFFEE16B5A1) - Experimental embodied route on the larger sample
+* [4x4x4x4 Edit-Mode Sample](https://sampanes.github.io/1D-maze/scan4d.html?map4d=041111111133313130113202025772547277745504777576744EC97F583B3A3028&edit=1) - Loads a shared 4D map directly into scan edit mode instead of auto-starting the run
