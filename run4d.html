@@ -14,9 +14,9 @@
 ">
   <div class="header">
     <h1>Diamond Maze IRL 4D</h1>
-    <p>Standalone first-person route for the 4D maze. This page now verifies real shared `map4d` loading and preserves the same continuous hyper-slice paradigm the future IRL camera will inhabit.</p>
+    <p>Standalone first-person route for the 4D maze. This page now inhabits the real shared `map4d` state while preserving the same continuous hyper-slice paradigm as the scan page.</p>
     <div class="header-nav-links">
-      <a href="scan4d.html" style="
+      <a id="linkBackToScan4d" href="scan4d.html" style="
         display: inline-block;
         font-size: 0.78rem;
         font-weight: 700;
@@ -69,8 +69,8 @@
       gap:14px;
     ">
       <div>
-        <div style="color:#7afcff; font-size:0.78rem; font-weight:800; letter-spacing:0.14em; text-transform:uppercase;">Milestone 5</div>
-        <h2 style="margin:8px 0 10px; color:#f2f5ff; font-size:1.45rem; line-height:1.15;">4D First-Person Traversal</h2>
+        <div style="color:#7afcff; font-size:0.78rem; font-weight:800; letter-spacing:0.14em; text-transform:uppercase;">Milestone 6</div>
+        <h2 style="margin:8px 0 10px; color:#f2f5ff; font-size:1.45rem; line-height:1.15;">4D Usability And Readability</h2>
         <p id="run4dSummary" style="margin:0; color:#9db1d8; line-height:1.55;">Waiting for initialization.</p>
       </div>
 
@@ -106,24 +106,25 @@
           <div><strong>Look:</strong> click to lock mouse, then move mouse</div>
           <div><strong>Rise / Lower:</strong> `Space / Shift`</div>
           <div><strong>Shift 4D:</strong> `Q / E`</div>
+          <div><strong>Inspect:</strong> hold `LMB` for x-ray</div>
           <div><strong>Reset pose:</strong> `R` or button above</div>
           <div><strong>Unlock mouse:</strong> `Esc`</div>
         </div>
       </div>
 
       <div style="padding:14px 14px 12px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);">
-        <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Milestone 5 Browser Test</div>
+        <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Milestone 6 Browser Test</div>
         <ul style="margin:10px 0 0; padding-left:18px; color:#d7e4ff; line-height:1.55;">
           <li id="run4dCheckBoot">Page boots with no URL map and no console errors.</li>
           <li id="run4dCheckMap4d">`?map4d=` decodes and reports grid/path metadata.</li>
-          <li id="run4dCheckOverview">The preview canvas below visibly reflects the reconstructed 4D hyper-slice.</li>
+          <li id="run4dCheckOverview">The embodied canvas below remains readable during ordinary traversal and hyper-shifting.</li>
         </ul>
       </div>
 
       <div style="padding:14px 14px 12px; border-radius:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06);">
         <div style="color:#7afcff; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.08em;">Milestone Boundary</div>
         <div style="margin-top:8px; color:#d7e4ff; line-height:1.55;">
-          This route now inhabits the same 4D hyper-slice world instead of leaving it in editor view. The map format and continuous slice logic stay the same; only the controls and camera have changed.
+          This pass is focused on navigation clarity. The route already uses the real 4D hyper-slice world; this milestone improves how that space reads while preserving the same map format and continuous slice logic.
         </div>
       </div>
     </section>

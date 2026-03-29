@@ -294,7 +294,7 @@ Known follow-up work still belongs here or in Milestone 3:
 
 ## Milestone 3: 3D IRL Usability Pass
 
-Status: partially started early
+Status: in progress
 
 ### Goal
 
@@ -350,6 +350,8 @@ That is acceptable. The remaining Milestone 3 work should still be deliberate an
 
 ## Milestone 4: 4D Map Load And Core Reuse Boundary
 
+Status: complete
+
 ### Goal
 
 Make `run4d.html` load the real 4D maze data using the existing `map4d` format and define exactly which 4D helpers are reused.
@@ -380,6 +382,15 @@ Preferred order:
 - the route can report successful load status and grid size
 - the shared/reused 4D helper boundary is clear in code
 
+### Current implementation notes
+
+Milestone 4 is now in place:
+
+- `run4d.html` loads real `?map4d=` data
+- the route reports grid size, solvability, path length, wall count, and load source
+- the route starts on the centered hyper-layer presentation rather than an arbitrary view
+- the standalone route no longer depends on the scan-page orbit/editor bootstrap to prove map loading
+
 ### Risks
 
 - `js/4d/4d-core.js` currently mixes pure logic with runtime state
@@ -391,6 +402,8 @@ Preferred order:
 - no final pointer-lock camera yet
 
 ## Milestone 5: 4D First-Person Traversal
+
+Status: in progress, first playable pass exists
 
 ### Goal
 
@@ -457,6 +470,8 @@ Do not make pitch alter horizontal movement direction. Horizontal movement shoul
 - passable space reads as air rather than ghost-solid cubes
 - faces between adjacent passable regions are not rendered
 - only exposed boundary faces remain visible so the space reads as halls, shafts, floors, ceilings, and walls
+- scan-to-IRL handoff uses the current live edited maze, not only stale URL state
+- IRL-to-scan return preserves the encoded maze state
 
 ### Risks
 
@@ -471,7 +486,28 @@ Do not make pitch alter horizontal movement direction. Horizontal movement shoul
 - no exotic 4D visualization beyond the current cross-section model
 - no reinterpretation into ordinary rooms or stacked discrete 3D levels
 
+### Current implementation notes
+
+At the current checkpoint, the first playable 4D pass already exists:
+
+- `run4d.html` is now a real playable first-person route rather than just a decode surface
+- pointer lock, yaw/pitch mouse-look, and `WASD` movement are active
+- `Space` / `Shift` move vertically
+- `Q/E` continuously shifts the 4th dimension
+- the renderer now uses exposed boundary faces so open volume reads as air instead of ghost cubes
+- default surfaces are mostly opaque for navigation readability
+- holding `LMB` temporarily enables x-ray-style inspection
+- scan-to-IRL handoff from `scan4d.html` serializes the current in-memory maze state before navigation
+- IRL-to-scan return preserves `map4d` and returns to edit mode
+
+Remaining work here is mostly:
+
+- finish render stability polish at close range
+- continue tuning readability without weakening the continuous hyper-slice paradigm
+
 ## Milestone 6: 4D Usability Pass
+
+Status: partially started early
 
 ### Goal
 
@@ -505,11 +541,31 @@ Make the 4D IRL route readable and comfortable enough to use for real exploratio
 - the route feels immersive rather than merely functional
 - the player can visually read where open air is versus where actual blocking surfaces are
 - temporary x-ray behaves like a deliberate inspection aid rather than the default navigation mode
+- close-range projection artifacts are reduced enough that they feel like minor polish rather than a camera-model problem
 
 ### Risks
 
 - visual noise from too much HUD
 - spending too long on effects before the core route is robust
+
+### Current implementation notes
+
+Some Milestone 6 work has already started because it materially improved navigation:
+
+- default opaque rendering is already in place
+- hold `LMB` x-ray is already in place
+- exposed faces already use stronger floor / wall / ceiling semantics
+- darker, thicker borders already improve cell-to-cell readability
+- near-plane clipping and thin-sliver suppression have already reduced the worst angle-dependent artifacts
+- the in-canvas HUD now shows current pose data more clearly
+- transient hyper-shift feedback now appears while `Q/E` is actively morphing the 4th dimension
+- the route presentation itself now labels this work as Milestone 6 rather than treating it as a hidden follow-up
+
+The remaining work here should stay narrow:
+
+- tighten close-camera polish
+- improve immersion/readability
+- avoid turning usability work into a major renderer rewrite
 
 ## Milestone 7: Sharing Cleanup
 

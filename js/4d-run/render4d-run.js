@@ -250,6 +250,28 @@ function drawQuad4dRun(ctx, quad, fillStyle, strokeStyle) {
     }
 }
 
+function drawRoundedHud4dRun(ctx, x, y, w, h, fill, stroke) {
+    const r = 14;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    if (stroke) {
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+}
+
 function withAlpha4dRun(color, alpha) {
     const match = color.match(/^rgba\(([^,]+),([^,]+),([^,]+),([^)]+)\)$/);
     if (!match) return color;
@@ -290,6 +312,9 @@ function render4dRunOverview() {
     sky.addColorStop(1, '#020305');
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const vignette = ctx.createRadialGradient(canvas.width * 0.5, canvas.height * 0.48, canvas.height * 0.12, canvas.width * 0.5, canvas.height * 0.5, canvas.width * 0.7);
+    vignette.addColorStop(0, 'rgba(0,0,0,0)');
+    vignette.addColorStop(1, 'rgba(0,0,0,0.30)');
 
     if (!run4dState.grid || !run4dState.crossSection) {
         ctx.fillStyle = '#9db1d8';
@@ -377,6 +402,9 @@ function render4dRunOverview() {
         drawQuad4dRun(ctx, item.projected, item.fill, item.edge);
     }
 
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
     const playerBase = projectPoint4dRun({ x: run4dState.player.x, y: run4dState.player.y, z: run4dState.player.z - 0.2 }, camera, canvas);
     if (playerBase) {
         ctx.save();
@@ -387,10 +415,7 @@ function render4dRunOverview() {
         ctx.restore();
     }
 
-    ctx.fillStyle = 'rgba(6,10,18,0.82)';
-    ctx.fillRect(18, 18, 412, 114);
-    ctx.strokeStyle = 'rgba(122,252,255,0.14)';
-    ctx.strokeRect(18, 18, 412, 114);
+    drawRoundedHud4dRun(ctx, 18, 18, 462, 136, 'rgba(6,10,18,0.84)', 'rgba(122,252,255,0.14)');
     ctx.fillStyle = '#e8f5ff';
     ctx.font = '700 14px system-ui';
     ctx.textAlign = 'left';
@@ -399,7 +424,45 @@ function render4dRunOverview() {
     ctx.fillStyle = '#9db1d8';
     ctx.fillText(`S ${run4dState.hyperSliceOffset.toFixed(2)}  |  layer ${run4dState.hyperLayer + 1}  |  yaw ${(run4dState.yaw * 180 / Math.PI).toFixed(1)} deg`, 32, 64);
     ctx.fillText(`pitch ${(run4dState.pitch * 180 / Math.PI).toFixed(1)} deg  |  ${run4dState.pointerLocked ? 'mouse look active' : 'click to lock mouse'}`, 32, 84);
-    ctx.fillText(`${xray ? 'LMB x-ray active' : 'Opaque by default; hold LMB for x-ray'}. Open volume is air, black is void.`, 32, 104);
+    ctx.fillText(`pos (${run4dState.player.x.toFixed(2)}, ${run4dState.player.y.toFixed(2)}, ${run4dState.player.z.toFixed(2)})  |  ${xray ? 'LMB x-ray active' : 'hold LMB for x-ray'}`, 32, 104);
+    ctx.fillText(`Open volume is air. Black is void. Q/E morphs the 4th dimension continuously.`, 32, 124);
+
+    const modeBadge = xray ? { text: 'X-RAY HELD', fill: 'rgba(255,216,79,0.18)', stroke: 'rgba(255,216,79,0.42)', textColor: '#ffe8a6' }
+        : { text: 'OPAQUE NAV', fill: 'rgba(122,252,255,0.14)', stroke: 'rgba(122,252,255,0.34)', textColor: '#dffbff' };
+    drawRoundedHud4dRun(ctx, canvas.width - 180, 18, 146, 34, modeBadge.fill, modeBadge.stroke);
+    ctx.fillStyle = modeBadge.textColor;
+    ctx.textAlign = 'center';
+    ctx.font = '700 12px system-ui';
+    ctx.fillText(modeBadge.text, canvas.width - 107, 40);
+
+    if (run4dState.shiftPulse > 0.01) {
+        const shiftLabel = run4dState.shiftDirection >= 0 ? 'SHIFTING +W' : 'SHIFTING -W';
+        const alpha = Math.min(0.9, run4dState.shiftPulse * 0.9);
+        drawRoundedHud4dRun(
+            ctx,
+            canvas.width - 208,
+            60,
+            174,
+            34,
+            `rgba(93,255,176,${(0.10 + alpha * 0.18).toFixed(3)})`,
+            `rgba(93,255,176,${(0.20 + alpha * 0.30).toFixed(3)})`
+        );
+        ctx.fillStyle = `rgba(223,255,238,${(0.75 + alpha * 0.25).toFixed(3)})`;
+        ctx.fillText(shiftLabel, canvas.width - 121, 82);
+
+        const laneW = 10;
+        const laneGap = 7;
+        const laneHeight = canvas.height * 0.18;
+        const laneY = canvas.height * 0.5 - laneHeight * 0.5;
+        const leftX = 26;
+        const rightX = canvas.width - 26 - laneW;
+        const laneAlpha = (0.04 + run4dState.shiftPulse * 0.14).toFixed(3);
+        ctx.fillStyle = `rgba(93,255,176,${laneAlpha})`;
+        ctx.fillRect(leftX, laneY, laneW, laneHeight);
+        ctx.fillRect(leftX + laneW + laneGap, laneY + 18, laneW, laneHeight - 36);
+        ctx.fillRect(rightX, laneY, laneW, laneHeight);
+        ctx.fillRect(rightX - laneW - laneGap, laneY + 18, laneW, laneHeight - 36);
+    }
 
     if (run4dState.completed) {
         ctx.fillStyle = 'rgba(93,255,176,0.12)';
@@ -413,13 +476,12 @@ function render4dRunOverview() {
     }
 
     if (!run4dState.pointerLocked) {
-        ctx.fillStyle = 'rgba(255,255,255,0.05)';
-        ctx.fillRect(canvas.width * 0.5 - 230, canvas.height - 66, 460, 42);
+        drawRoundedHud4dRun(ctx, canvas.width * 0.5 - 244, canvas.height - 74, 488, 52, 'rgba(255,255,255,0.05)', null);
         ctx.fillStyle = '#dff5ff';
         ctx.textAlign = 'center';
         ctx.font = '600 13px system-ui';
-        ctx.fillText('Click in the view to enable first-person mouse look', canvas.width * 0.5, canvas.height - 46);
-        ctx.fillText('Then use WASD, Space/Shift, Q/E, and hold LMB for temporary x-ray', canvas.width * 0.5, canvas.height - 29);
+        ctx.fillText('Click in the view to enable first-person mouse look', canvas.width * 0.5, canvas.height - 52);
+        ctx.fillText('Then use WASD, Space/Shift, Q/E, and hold LMB for temporary x-ray', canvas.width * 0.5, canvas.height - 34);
     } else {
         ctx.strokeStyle = 'rgba(122,252,255,0.8)';
         ctx.beginPath();
@@ -443,9 +505,16 @@ function tick4dRun(ts) {
     if (!run4dState.lastFrameAt) run4dState.lastFrameAt = ts;
     const dt = Math.min(0.05, (ts - run4dState.lastFrameAt) / 1000);
     run4dState.lastFrameAt = ts;
+    run4dState.shiftPulse = Math.max(0, run4dState.shiftPulse - dt * 1.7);
 
     if (run4dState.grid) {
+        const prevSliceOffset = run4dState.hyperSliceOffset;
         moveSlice4dRun(dt);
+        const shiftDelta = run4dState.hyperSliceOffset - prevSliceOffset;
+        if (Math.abs(shiftDelta) > 0.0001) {
+            run4dState.shiftPulse = Math.min(1, run4dState.shiftPulse + Math.min(0.45, Math.abs(shiftDelta) * 8.5));
+            run4dState.shiftDirection = shiftDelta >= 0 ? 1 : -1;
+        }
         run4dState.crossSection = buildCrossSection4dRun(run4dState.grid, run4dState.hyperSliceOffset, run4dState.bfsPath);
         movePlayer4dRun(dt, run4dState.crossSection);
         if (!run4dState.completed && playerHitsEnd4dRun(run4dState.crossSection)) {

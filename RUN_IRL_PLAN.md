@@ -294,6 +294,15 @@ Optional future enhancement:
 
 - `?view=irl` can still exist later on the scan pages as a redirect or convenience alias
 
+Current implemented navigation behavior:
+
+- `scan3d.html -> run3d.html` can carry the current serialized map into the IRL route
+- `scan4d.html -> run4d.html` now carries the current in-memory edited maze, validates it if needed, serializes it, and opens the IRL route with `?map4d=...`
+- `run3d.html -> scan3d.html` preserves the current encoded map when returning
+- `run4d.html -> scan4d.html` preserves the current encoded map and explicitly returns to edit mode via `edit=1`
+
+This is the correct behavior for the dedicated-route architecture because the IRL pages are now real working destinations rather than placeholders.
+
 But the primary implementation target should be:
 
 - separate pages first
@@ -504,7 +513,10 @@ Expected result:
 Render the current `buildCrossSection4d(hyperSliceOffset)` boxes from a first-person camera:
 
 - passable boxes define the navigable volume
-- walls remain visible as solid dark boundaries
+- open passable space must read as air, not as semi-solid ghost cubes
+- only exposed boundary faces should be rendered
+- faces between adjacent passable regions should be absent entirely
+- rendered surfaces should read differently as floors, ceilings, and walls
 - start/end keep their existing semantic colors
 - hyper-slice changes should visibly morph the space
 
@@ -514,6 +526,15 @@ Very important:
 - visible space must change continuously as the hyper-slice moves
 - do not convert the world into discrete hyper-layers for traversal
 - the camera is moving through the same continuously deforming world the scan view already shows
+
+Current implementation direction already proven by the code:
+
+- the 4D IRL route is now playable with pointer lock, yaw/pitch mouse-look, `WASD`, `Space` / `Shift`, and `Q/E`
+- default rendering is now more opaque so the current local space reads like a place rather than a cloud of transparent cells
+- holding `LMB` temporarily re-enables x-ray style visibility to inspect upcoming geometry
+- the in-canvas HUD now reports pose and slice state more clearly during traversal
+- active hyper-shifting now has explicit transient visual feedback rather than relying only on the geometry change itself
+- remaining render issues are now mostly close-range projection polish, not world-logic problems
 
 ### 2D map / 1D runner POV stretch goal
 
@@ -577,6 +598,7 @@ Technical note:
 
 - `scan4d.html`
   Add a clear link/button to `run4d.html`, ideally preserving the current serialized map when one exists.
+  If the in-memory maze is newer than the URL, the handoff should serialize the live maze state before navigation.
 
 ### 3D IRL files
 
@@ -607,7 +629,7 @@ Technical note:
   New 4D IRL renderer. Should reuse the current 4D cross-section boxes but draw them from the player's first-person camera.
 
 - `js/4d-run/ui4d-run.js`
-  New 4D IRL UI module. Handles pointer lock, HUD updates, onboarding text, and navigation back to scan mode.
+  New 4D IRL UI module. Handles pointer lock, HUD updates, onboarding text, temporary x-ray input, and navigation back to scan mode while preserving `map4d` and forcing edit mode on return.
 
 - `js/4d-run/init4d-run.js`
   New 4D IRL bootstrap. Loads maps from the URL, initializes the page, starts the IRL loop, and keeps this mode isolated from `scan4d.html`.
@@ -648,6 +670,10 @@ Technical note:
 - `drawScanSlice4d()` in `js/4d/render4d.js` already iterates those intersected cells and colors start/end/path/walls distinctly.
 - The new IRL renderer should reuse the same cross-section boxes but swap the orbit camera projection for a player-centered first-person projection.
 - Existing semantic coloring can be reused initially, then simplified later if needed for readability.
+- The correct embodied rendering model is boundary-face rendering, not drawing every passable box as a translucent solid.
+- Interior faces between two passable neighbors should not be drawn.
+- Default navigation readability is improved when visible surfaces are mostly opaque.
+- Temporary x-ray is useful as a hold-to-inspect affordance, not as the default render mode.
 - Because `run4d.html` is separate, `render4d-run.js` can be written purely for first-person rendering without carrying scan/orbit compatibility code.
 - The authoritative animation is still "continuous hyperSliceOffset changes produce continuous world morphing."
 - If the IRL view ever behaves like discrete layer hopping, that is a bug relative to the design goal.
@@ -673,6 +699,16 @@ Only add new pages that consume the same query parameters.
 ### Should existing scan mode be replaced?
 
 No. IRL mode is additive.
+
+### How should scan and IRL handoff behave now that both routes are real?
+
+The dedicated-route approach now needs two-way state-preserving handoff:
+
+- entering IRL from a scan page should use the current maze state, not merely the last already-encoded URL
+- returning from IRL to a scan page should preserve the encoded maze in the URL
+- returning from `run4d.html` to `scan4d.html` should land in edit mode, not immediately mid-scan
+
+That behavior is already the right direction in the codebase and should be preserved.
 
 ### Should IRL live behind the same page bootstraps?
 
@@ -713,6 +749,8 @@ The real project direction is:
 
 - 3D: add a new first-person presentation on top of the current continuous 2D slice geometry
 - 4D: add a first-person camera presentation on top of the already-existing inhabitable 3D scan volume
+- 4D readability depends on treating passable volume as air and rendering only exposed boundary faces
+- 4D navigation now also benefits from a hold-to-xray inspection mode rather than making the whole world permanently ghostlike
 - in both cases, preserve the exact 45 degree continuous slice paradigm rather than approximating it with discrete floors or rooms
 - optionally later: give the original 1D runner an over-the-shoulder rope-in-space POV while still preserving the underlying 1D runner logic
 
@@ -721,5 +759,6 @@ And the safest delivery structure is:
 - dedicated URLs: `run3d.html` and `run4d.html`
 - dedicated JS directories: `js/3d-run/` and `js/4d-run/`
 - reuse of shared pure helpers only where it reduces risk instead of increasing coupling
+- explicit scan-to-IRL and IRL-to-scan handoff that preserves the current encoded maze and mode expectations
 
 That is smaller, safer, and much more compatible with the current codebase than trying to retrofit IRL into the existing scan pages immediately.

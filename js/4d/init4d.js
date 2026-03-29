@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusBar       = document.getElementById('statusBar');
     const scanReadout     = document.getElementById('scanReadout4d');
     const hyperSliceFill  = document.getElementById('hyperSliceFill');
+    const linkRun4d       = document.getElementById('linkRun4d');
     const hyperScanHint   = document.getElementById('hyperScanHint');
     const btnDismissHint  = document.getElementById('btnDismissHint');
 
@@ -204,6 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const params = new URLSearchParams(window.location.search);
             const mapString = params.get('map4d');
+            const forceEditMode = params.get('edit') === '1';
             if (!mapString) return false;
             const loaded = applySerializedMap4d(mapString.trim());
             if (!loaded) return false;
@@ -213,13 +215,20 @@ document.addEventListener('DOMContentLoaded', () => {
             runBfs();
             updateUiForMode();
             drawHyperVolume4d();
-            if (solvable4d) {
+            if (solvable4d && !forceEditMode) {
                 setScanActive4d(true);
                 updateUiForMode();
                 setStatus(
                     'Shared 4D maze loaded. Scan started — reach the red End. ' +
                     'Hold P to peek at the editor layer.',
                     'info'
+                );
+            } else if (forceEditMode) {
+                setScanActive4d(false);
+                updateUiForMode();
+                setStatus(
+                    'Shared 4D maze loaded in edit mode.',
+                    'neutral'
                 );
             }
             return true;
@@ -418,6 +427,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 setStatus('Link ready in address bar.', 'info');
             }
             try { window.history.replaceState({}, '', url.pathname + url.search); } catch (_) {}
+        });
+    }
+
+    if (linkRun4d) {
+        linkRun4d.addEventListener('click', (e) => {
+            e.preventDefault();
+
+            // Treat the current editor state as the source of truth when entering IRL.
+            // If edits are dirty, validate first; only navigable mazes should launch.
+            if (needsValidation) {
+                needsValidation = false;
+                runBfs();
+            }
+
+            if (!solvable4d) {
+                syncScanButton();
+                setStatus('Cannot enter 4D IRL: current maze has no valid path. Fix or validate the map first.', 'error');
+                return;
+            }
+
+            const encoded = serializeMaze4dToHex();
+            const target = new URL('run4d.html', window.location.href);
+            target.searchParams.set('map4d', encoded);
+            window.location.href = target.toString();
         });
     }
 

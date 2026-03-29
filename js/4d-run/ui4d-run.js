@@ -1,14 +1,19 @@
 function initUi4dRun() {
+    const goBackToScan4d = (e) => {
+        if (e) e.preventDefault();
+        const url = new URL(window.location.href);
+        const target = new URL('scan4d.html', url);
+        const map4d = url.searchParams.get('map4d');
+        if (map4d) target.searchParams.set('map4d', map4d);
+        target.searchParams.set('edit', '1');
+        window.location.href = target.toString();
+    };
+
     const btn = document.getElementById('btnOpenScan4d');
-    if (btn) {
-        btn.addEventListener('click', () => {
-            const url = new URL(window.location.href);
-            const target = new URL('scan4d.html', url);
-            const map4d = url.searchParams.get('map4d');
-            if (map4d) target.searchParams.set('map4d', map4d);
-            window.location.href = target.toString();
-        });
-    }
+    if (btn) btn.addEventListener('click', goBackToScan4d);
+
+    const linkBack = document.getElementById('linkBackToScan4d');
+    if (linkBack) linkBack.addEventListener('click', goBackToScan4d);
 
     const resetPose = () => {
         if (!run4dState.grid || !run4dState.crossSection) return;

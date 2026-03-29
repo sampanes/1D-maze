@@ -74,6 +74,23 @@ Current state of `run3d.html`:
 - includes a browser-side decode/BFS verification surface
 - includes a first playable pass of the embodied 3D route
 
+Current state of `run4d.html`:
+
+- decodes existing `?map4d=` links
+- includes a real first-person playable route through the current 4D hyper-slice
+- uses mouse look plus `WASD`, `Space` / `Shift`, and `Q` / `E`
+- preserves the same continuous hyper-slice logic rather than turning the maze into discrete rooms
+- renders passable volume as air by drawing exposed boundary faces instead of ghost-solid cubes
+- defaults to more opaque surfaces for navigation readability
+- lets you hold `LMB` for temporary x-ray inspection
+- now includes stronger in-view HUD/readability feedback while shifting through the 4th dimension
+
+Route handoff behavior:
+
+- entering `run4d.html` from `scan4d.html` now serializes the current live edited maze state before navigation
+- returning from `run4d.html` to `scan4d.html` preserves `?map4d=...` and lands back in edit mode
+- the same dedicated-route principle applies to the 3D pair as well
+
 Example URLs once hosted:
 
 - `run3d.html?map3d=03492ED42`
