@@ -87,6 +87,8 @@ Current state of `run4d.html`:
 - now includes live route-state readouts so you can tell pointer-lock state, current view mode, and current position without guesswork
 - now treats the red finish more like a visible boundary/threshold to cross instead of only a flat colored endpoint
 - finish-boundary lines can now persist even on hall-facing pass-through finish faces, so the goal reads more like crossing glowing planes than touching a red block
+- near clean hyper-slice alignments, the 4D route now softly snaps the rendered slice to reduce tiny sliver layers without changing the underlying traversal logic
+- completion now includes a brief center-screen celebration cue so the finish is noticeable even if you are not watching the top HUD
 
 Route handoff behavior:
 

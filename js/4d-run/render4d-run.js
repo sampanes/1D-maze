@@ -334,10 +334,75 @@ function drawRoundedHud4dRun(ctx, x, y, w, h, fill, stroke) {
     }
 }
 
+function drawCompletionCelebration4dRun(ctx, canvas, pulse) {
+    if (pulse <= 0.001) return;
+    const t = Math.max(0, Math.min(1, pulse / 1.35));
+    const alpha = smoothStep4dRun(t);
+    const fade = Math.max(0, Math.min(1, pulse / 0.95));
+
+    drawRoundedHud4dRun(
+        ctx,
+        canvas.width * 0.5 - 230,
+        canvas.height * 0.5 - 56,
+        460,
+        104,
+        `rgba(10,18,24,${(0.28 * alpha).toFixed(3)})`,
+        `rgba(255,220,120,${(0.24 * alpha).toFixed(3)})`
+    );
+    ctx.textAlign = 'center';
+    ctx.fillStyle = `rgba(255,247,220,${(0.95 * alpha).toFixed(3)})`;
+    ctx.font = '800 28px system-ui';
+    ctx.fillText('FINISH', canvas.width * 0.5, canvas.height * 0.5 - 8);
+    ctx.font = '700 15px system-ui';
+    ctx.fillStyle = `rgba(223,255,238,${(0.88 * alpha).toFixed(3)})`;
+    ctx.fillText('Crossed the glowing boundary', canvas.width * 0.5, canvas.height * 0.5 + 20);
+
+    const colors = ['#ffe27a', '#ff8f70', '#7afcff', '#5dffb0', '#fff5d1'];
+    const confettiCount = 56;
+    ctx.save();
+    for (let i = 0; i < confettiCount; i++) {
+        const phase = i / confettiCount;
+        const angle = phase * Math.PI * 4 + 0.25;
+        const radial = 54 + phase * 130;
+        const drift = (1 - fade) * 74;
+        const x = canvas.width * 0.5 + Math.cos(angle) * (radial + drift * 0.55);
+        const y = canvas.height * 0.5 - 10 + Math.sin(angle) * (radial * 0.35 + drift) - (1 - fade) * 26;
+        const w = 8 + (i % 4);
+        const h = 5 + (i % 3);
+        ctx.translate(x, y);
+        ctx.rotate(angle + (1 - fade) * 2.4);
+        ctx.fillStyle = colors[i % colors.length] + Math.round(alpha * 255).toString(16).padStart(2, '0');
+        ctx.fillRect(-w * 0.5, -h * 0.5, w, h);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+    ctx.restore();
+}
+
 function withAlpha4dRun(color, alpha) {
     const match = color.match(/^rgba\(([^,]+),([^,]+),([^,]+),([^)]+)\)$/);
     if (!match) return color;
     return `rgba(${match[1].trim()},${match[2].trim()},${match[3].trim()},${alpha.toFixed(3)})`;
+}
+
+function smoothStep4dRun(t) {
+    const clamped = Math.max(0, Math.min(1, t));
+    return clamped * clamped * (3 - 2 * clamped);
+}
+
+function getVisualSliceOffset4dRun(sliceOffset) {
+    const scaled = sliceOffset * RUN4D_SQ2;
+    const target = Math.round(scaled);
+    const delta = target - scaled;
+    const absDelta = Math.abs(delta);
+
+    // Only collapse very small residual slivers; leave ordinary partial intersections intact.
+    const snapOuter = 0.055;
+    const snapInner = 0.018;
+    if (absDelta >= snapOuter) return sliceOffset;
+    if (absDelta <= snapInner) return target / RUN4D_SQ2;
+
+    const t = smoothStep4dRun((snapOuter - absDelta) / (snapOuter - snapInner));
+    return (scaled + delta * t) / RUN4D_SQ2;
 }
 
 function pointInBoxRender4dRun(x, y, z, box) {
@@ -389,6 +454,8 @@ function render4dRunOverview() {
         return;
     }
 
+    const renderSliceOffset = getVisualSliceOffset4dRun(run4dState.hyperSliceOffset);
+    const renderCrossSection = buildCrossSection4dRun(run4dState.grid, renderSliceOffset, run4dState.bfsPath);
     const camera = buildCamera4dRun();
     const drawables = [];
     const pushBox = (box, palette) => {
@@ -399,7 +466,7 @@ function render4dRunOverview() {
                 y: face.center.y + face.normal.y * 0.02,
                 z: face.center.z + face.normal.z * 0.02,
             };
-            const passThroughFace = pointPassableRender4dRun(sample.x, sample.y, sample.z, run4dState.crossSection);
+            const passThroughFace = pointPassableRender4dRun(sample.x, sample.y, sample.z, renderCrossSection);
 
             const centerDx = face.center.x - camera.pos.x;
             const centerDy = face.center.y - camera.pos.y;
@@ -464,13 +531,13 @@ function render4dRunOverview() {
         finishThrough: true,
     };
 
-    const pathSet = new Set(run4dState.crossSection.pathBoxes.map((box) => `${box.x0}|${box.x1}|${box.y0}|${box.y1}|${box.z0}|${box.z1}`));
-    for (const box of run4dState.crossSection.passable) {
+    const pathSet = new Set(renderCrossSection.pathBoxes.map((box) => `${box.x0}|${box.x1}|${box.y0}|${box.y1}|${box.z0}|${box.z1}`));
+    for (const box of renderCrossSection.passable) {
         const key = `${box.x0}|${box.x1}|${box.y0}|${box.y1}|${box.z0}|${box.z1}`;
         pushBox(box, pathSet.has(key) ? pathPalette : basePalette);
     }
-    if (run4dState.crossSection.startBox) pushBox(run4dState.crossSection.startBox, startPalette);
-    if (run4dState.crossSection.endBox) pushBox(run4dState.crossSection.endBox, endPalette);
+    if (renderCrossSection.startBox) pushBox(renderCrossSection.startBox, startPalette);
+    if (renderCrossSection.endBox) pushBox(renderCrossSection.endBox, endPalette);
 
     drawables.sort((a, b) => (b.maxDepth - a.maxDepth) || (b.avgDepth - a.avgDepth));
     for (const item of drawables) {
@@ -566,6 +633,10 @@ function render4dRunOverview() {
         ctx.fillText('Hyper-slice complete: crossed the finish boundary.', canvas.width * 0.5, 58);
     }
 
+    if (run4dState.completionPulse > 0.001) {
+        drawCompletionCelebration4dRun(ctx, canvas, run4dState.completionPulse);
+    }
+
     if (!run4dState.pointerLocked) {
         drawRoundedHud4dRun(ctx, canvas.width * 0.5 - 244, canvas.height - 74, 488, 52, 'rgba(255,255,255,0.05)', null);
         ctx.fillStyle = '#dff5ff';
@@ -597,6 +668,7 @@ function tick4dRun(ts) {
     const dt = Math.min(0.05, (ts - run4dState.lastFrameAt) / 1000);
     run4dState.lastFrameAt = ts;
     run4dState.shiftPulse = Math.max(0, run4dState.shiftPulse - dt * 1.7);
+    run4dState.completionPulse = Math.max(0, run4dState.completionPulse - dt);
 
     if (run4dState.grid) {
         const prevSliceOffset = run4dState.hyperSliceOffset;
@@ -610,6 +682,7 @@ function tick4dRun(ts) {
         movePlayer4dRun(dt, run4dState.crossSection);
         if (!run4dState.completed && playerHitsEnd4dRun(run4dState.crossSection)) {
             run4dState.completed = true;
+            run4dState.completionPulse = 1.35;
             const statusBar = document.getElementById('statusBar');
             if (statusBar) {
                 statusBar.textContent = '4D route complete: reached the red finish.';

@@ -18,6 +18,7 @@ const run4dState = {
     xrayHeld: false,
     shiftPulse: 0,
     shiftDirection: 0,
+    completionPulse: 0,
     keys: Object.create(null),
     lastFrameAt: 0,
     completed: false,

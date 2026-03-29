@@ -534,6 +534,7 @@ Current implementation direction already proven by the code:
 - holding `LMB` temporarily re-enables x-ray style visibility to inspect upcoming geometry
 - the in-canvas HUD now reports pose and slice state more clearly during traversal
 - active hyper-shifting now has explicit transient visual feedback rather than relying only on the geometry change itself
+- near exact hyper-slice alignments, the rendered 4D slice may softly snap to the nearest clean slice state to suppress tiny sliver geometry while keeping the real traversal logic continuous
 - remaining render issues are now mostly close-range projection polish, not world-logic problems
 
 ### 2D map / 1D runner POV stretch goal

@@ -535,6 +535,7 @@ Make the 4D IRL route readable and comfortable enough to use for real exploratio
 - preserve visibility into passable volume by treating non-boundary interior faces as fully absent rather than translucent
 - default opaque surface rendering so the current local space reads like a real place
 - hold `LMB` for temporary x-ray mode so the player can inspect upcoming geometry without permanently losing spatial clarity
+- add a narrow visual soft-snap near clean hyper-slice alignments so very tiny residual sliver layers collapse into readable cube-like spaces
 
 ### Done means
 
@@ -544,6 +545,7 @@ Make the 4D IRL route readable and comfortable enough to use for real exploratio
 - the player can visually read where open air is versus where actual blocking surfaces are
 - temporary x-ray behaves like a deliberate inspection aid rather than the default navigation mode
 - close-range projection artifacts are reduced enough that they feel like minor polish rather than a camera-model problem
+- tiny near-integer hyper-slice slivers stop cluttering the view once the slice is already effectively aligned
 
 ### Risks
 
@@ -567,6 +569,8 @@ Some Milestone 6 work has already started because it materially improved navigat
 - finish-line readability is now an explicit usability concern rather than an optional flourish
 - the red finish now has a stronger boundary-like treatment so it reads more like a threshold to cross than a generic colored surface
 - the finish boundary treatment now persists on pass-through faces too, so hall-facing finish planes still read as something to cross
+- a narrow near-integer soft-snap is now part of the intended readability strategy for hyper-slice rendering
+- completion now needs a brief center-screen celebration cue, not only persistent top-of-screen status text
 
 The remaining work here should stay narrow:
 
