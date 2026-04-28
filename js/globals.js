@@ -47,6 +47,7 @@ const statusBar = document.getElementById('statusBar');
 const gridSlider = document.getElementById('gridSlider');
 const gridVal = document.getElementById('gridVal');
 const btnWipe = document.getElementById('btnWipe');
+const btnRandomize = document.getElementById('btnRandomize');
 const btnValidate = document.getElementById('btnValidate');
 const btnGetLink = document.getElementById('btnGetLink');
 const btnScan = document.getElementById('btnScan');

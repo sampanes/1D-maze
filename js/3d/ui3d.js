@@ -122,6 +122,41 @@ btnWipe.addEventListener('click', (e) => {
 
 // ── Validate button ───────────────────────────────────────────────────────────
 
+if (btnRandomize) {
+    btnRandomize.addEventListener('click', () => {
+        if (scanActive3d) stopScan3d('Returned to build mode.');
+
+        const N = gridSize3d;
+        const generated = generateRandomSolvableMaze({
+            size: N,
+            dimensions: 3,
+            start: [0, 0, N - 1],
+            end: [N - 1, N - 1, 0],
+        });
+
+        grid3d = Array.from({ length: N }, () =>
+            Array.from({ length: N }, () => Array(N).fill(1))
+        );
+        for (const key of generated.openKeys) {
+            const [i, j, k] = key.split(',').map(Number);
+            grid3d[k][j][i] = 0;
+        }
+        grid3d[N - 1][0][0] = 0;
+        grid3d[0][N - 1][N - 1] = 0;
+        currentLayer = N - 1;
+
+        const path = bfs3d();
+        btnScan.disabled = !path;
+        btnGetLink.disabled = !path;
+        btnGetLink.classList.toggle('hidden', !path);
+        redraw3d();
+
+        const pct = Math.round(generated.wallRatio * 100);
+        const pathLength = path ? path.length : generated.pathLength;
+        setStatus(`Random solvable 3D maze generated with ${pct}% walls. Path: ${pathLength} cells.`, 'success');
+    });
+}
+
 btnValidate.addEventListener('click', () => {
     validatePath3d();
 });

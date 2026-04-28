@@ -124,6 +124,17 @@ button:disabled {
     color: #171717;
 }
 
+.btn-randomize {
+    background: rgba(122, 252, 255, 0.08);
+    color: #bdfaff;
+    border: 1px solid rgba(122, 252, 255, 0.24);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.btn-randomize:hover:not(:disabled) {
+    box-shadow: 0 8px 22px rgba(0, 217, 245, 0.10), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
 .btn-scan {
     background: linear-gradient(135deg, #5dffb0, #00d9f5);
     color: #061018;

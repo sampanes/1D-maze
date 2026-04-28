@@ -16,6 +16,38 @@ btnWipe.addEventListener('click', () => {
     setup();
 });
 
+if (btnRandomize) {
+    btnRandomize.addEventListener('click', () => {
+        if (scanActive) stopScan();
+
+        const generated = generateRandomSolvableMaze({
+            size: gridSize,
+            dimensions: 2,
+            start: [0, 0],
+            end: [gridSize - 1, gridSize - 1],
+        });
+
+        grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(1));
+        for (const key of generated.openKeys) {
+            const [r, c] = key.split(',').map(Number);
+            grid[r][c] = 0;
+        }
+        grid[0][0] = 0;
+        grid[gridSize - 1][gridSize - 1] = 0;
+
+        bfsPath = bfs();
+        solvable = !!bfsPath;
+        btnScan.disabled = !solvable;
+        updateShareButton();
+        resetScannerState();
+        drawMaze(bfsPath);
+        drawScanView(performance.now());
+
+        const pct = Math.round(generated.wallRatio * 100);
+        setStatus(`Random solvable maze generated with ${pct}% walls. Start Scan is enabled.`, 'success');
+    });
+}
+
 btnValidate.addEventListener('click', () => {
     bfsPath = bfs();
     if (bfsPath) {
