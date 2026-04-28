@@ -151,11 +151,8 @@ function expandProjectedFace4dRun(projected) {
 }
 
 function projectClippedFace4dRun(faceQuad, camera, canvas) {
-    const nearZ = 0.02;
-    const cameraPoints = faceQuad
-        .map((point) => cameraSpacePoint4dRun(point, camera))
-        .filter((point) => point.cz > -0.6);
-    if (cameraPoints.length < 3) return null;
+    const nearZ = 0.035;
+    const cameraPoints = faceQuad.map((point) => cameraSpacePoint4dRun(point, camera));
 
     const clipped = clipPolygonToNearPlane4dRun(cameraPoints, nearZ);
     if (clipped.length < 3) return null;
@@ -407,19 +404,10 @@ function smoothStep4dRun(t) {
 }
 
 function getVisualSliceOffset4dRun(sliceOffset) {
-    const scaled = sliceOffset * RUN4D_SQ2;
-    const target = Math.round(scaled);
-    const delta = target - scaled;
-    const absDelta = Math.abs(delta);
-
-    // Only collapse very small residual slivers; leave ordinary partial intersections intact.
-    const snapOuter = 0.055;
-    const snapInner = 0.018;
-    if (absDelta >= snapOuter) return sliceOffset;
-    if (absDelta <= snapInner) return target / RUN4D_SQ2;
-
-    const t = smoothStep4dRun((snapOuter - absDelta) / (snapOuter - snapInner));
-    return (scaled + delta * t) / RUN4D_SQ2;
+    // Keep visual geometry in lockstep with collision geometry. Snapping tiny
+    // residual slices to exact layer boundaries made walls visibly nudge during
+    // mid/high-dimensional morphing.
+    return sliceOffset;
 }
 
 function pointInBoxRender4dRun(x, y, z, box) {
@@ -484,12 +472,6 @@ function render4dRunOverview() {
                 z: face.center.z + face.normal.z * 0.02,
             };
             const passThroughFace = pointPassableRender4dRun(sample.x, sample.y, sample.z, renderCrossSection);
-
-            const centerDx = face.center.x - camera.pos.x;
-            const centerDy = face.center.y - camera.pos.y;
-            const centerDz = face.center.z - camera.pos.z;
-            const centerDepth = centerDx * camera.forward.x + centerDy * camera.forward.y + centerDz * camera.forward.z;
-            if (centerDepth <= 0.02) continue;
 
             const projected = projectClippedFace4dRun(face.quad, camera, canvas);
             if (!projected) continue;
