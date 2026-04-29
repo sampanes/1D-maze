@@ -46,8 +46,10 @@ const statusBar = document.getElementById('statusBar');
 
 const gridSlider = document.getElementById('gridSlider');
 const gridVal = document.getElementById('gridVal');
+const mazeDifficulty = document.getElementById('mazeDifficulty');
 const btnWipe = document.getElementById('btnWipe');
 const btnRandomize = document.getElementById('btnRandomize');
+const btnDailyMaze = document.getElementById('btnDailyMaze');
 const btnValidate = document.getElementById('btnValidate');
 const btnGetLink = document.getElementById('btnGetLink');
 const btnScan = document.getElementById('btnScan');

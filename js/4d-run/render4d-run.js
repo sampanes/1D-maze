@@ -51,7 +51,10 @@ function render4dRunMetrics() {
         'First-person route through the current 4D hyper-slice. White = walkable space, gold = BFS hint, green/red = anchors.'
     );
     setText('run4dPointerState', run4dState.pointerLocked ? 'Mouse look active' : 'Click view to lock');
-    setText('run4dViewMode', run4dState.xrayHeld ? 'X-ray held' : 'Opaque nav');
+    setText(
+        'run4dViewMode',
+        `${run4dState.xrayHeld ? 'X-ray held' : 'Opaque nav'}${run4dState.breadcrumbsEnabled ? ' + breadcrumbs' : ''}`
+    );
     setText('run4dCompletionState', run4dState.completed ? 'Finish reached' : 'Not reached');
     setText('run4dPlayerPos', `(${run4dState.player.x.toFixed(2)}, ${run4dState.player.y.toFixed(2)}, ${run4dState.player.z.toFixed(2)})`);
     setText(
@@ -427,6 +430,43 @@ function pointPassableRender4dRun(x, y, z, cs) {
     return false;
 }
 
+function recordBreadcrumb4dRun() {
+    if (!run4dState.breadcrumbsEnabled || !run4dState.grid) return;
+    const next = {
+        x: run4dState.player.x,
+        y: run4dState.player.y,
+        z: run4dState.player.z,
+        slice: run4dState.hyperSliceOffset,
+    };
+    const last = run4dState.breadcrumbs[run4dState.breadcrumbs.length - 1];
+    if (last) {
+        const dist = Math.hypot(next.x - last.x, next.y - last.y, next.z - last.z);
+        const sliceDist = Math.abs(next.slice - last.slice);
+        if (dist < 0.18 && sliceDist < 0.14) return;
+    }
+    run4dState.breadcrumbs.push(next);
+    if (run4dState.breadcrumbs.length > 160) run4dState.breadcrumbs.shift();
+}
+
+function drawBreadcrumbs4dRun(ctx, camera, canvas) {
+    if (!run4dState.breadcrumbsEnabled || !run4dState.breadcrumbs.length) return;
+    const visible = run4dState.breadcrumbs.filter((point) => Math.abs(point.slice - run4dState.hyperSliceOffset) < 0.60);
+    for (let i = 0; i < visible.length; i++) {
+        const crumb = visible[i];
+        const projected = projectPoint4dRun({ x: crumb.x, y: crumb.y, z: crumb.z }, camera, canvas);
+        if (!projected) continue;
+        const age = visible.length <= 1 ? 1 : i / (visible.length - 1);
+        const alpha = 0.12 + age * 0.36;
+        const radius = Math.max(2.0, Math.min(5.2, 7 / Math.max(1, projected.depth)));
+        ctx.save();
+        ctx.fillStyle = `rgba(122,252,255,${alpha.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
 function render4dRunOverview() {
     const canvas = document.getElementById('run4dOverviewCanvas');
     if (!canvas) return;
@@ -554,6 +594,8 @@ function render4dRunOverview() {
         }
     }
 
+    drawBreadcrumbs4dRun(ctx, camera, canvas);
+
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -679,6 +721,7 @@ function tick4dRun(ts) {
         }
         run4dState.crossSection = buildCrossSection4dRun(run4dState.grid, run4dState.hyperSliceOffset, run4dState.bfsPath);
         movePlayer4dRun(dt, run4dState.crossSection);
+        recordBreadcrumb4dRun();
         if (!run4dState.completed && playerHitsEnd4dRun(run4dState.crossSection)) {
             run4dState.completed = true;
             run4dState.completionPulse = 1.35;

@@ -18,6 +18,7 @@ function initUi4dRun() {
     const resetPose = () => {
         if (!run4dState.grid || !run4dState.crossSection) return;
         reset4dRunPoseFromStart();
+        run4dState.breadcrumbs = [];
         run4dState.completed = false;
         const statusBar = document.getElementById('statusBar');
         if (statusBar) {
@@ -44,6 +45,22 @@ function initUi4dRun() {
 
     const resetBtn = document.getElementById('btnResetRun4dPose');
     if (resetBtn) resetBtn.addEventListener('click', resetPose);
+
+    const breadcrumbToggle = document.getElementById('toggleRun4dBreadcrumbs');
+    if (breadcrumbToggle) {
+        breadcrumbToggle.checked = !!run4dState.breadcrumbsEnabled;
+        breadcrumbToggle.addEventListener('change', () => {
+            run4dState.breadcrumbsEnabled = breadcrumbToggle.checked;
+            run4dState.breadcrumbs = [];
+            const statusBar = document.getElementById('statusBar');
+            if (statusBar && run4dState.grid) {
+                statusBar.textContent = run4dState.breadcrumbsEnabled
+                    ? 'Breadcrumbs enabled. This lowers navigation difficulty.'
+                    : 'Breadcrumbs disabled.';
+                statusBar.className = 'status-bar info';
+            }
+        });
+    }
 
     const canvas = document.getElementById('run4dOverviewCanvas');
     if (canvas) {

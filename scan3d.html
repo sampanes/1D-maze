@@ -61,6 +61,14 @@
       <input id="gridSlider" type="range" min="2" max="16" value="5" step="1" />
       <span class="val" id="gridVal">5</span>
     </div>
+    <div class="control-group">
+      <label for="mazeDifficulty">Difficulty</label>
+      <select id="mazeDifficulty">
+        <option value="easy">Easy</option>
+        <option value="normal" selected>Normal</option>
+        <option value="hard">Hard</option>
+      </select>
+    </div>
 
     <div class="control-group">
       <label>Layer</label>
@@ -81,6 +89,7 @@
 
     <button id="btnWipe" class="btn-wipe">Wipe</button>
     <button id="btnRandomize" class="btn-randomize" title="Generate a solvable random 3D maze with at least 40% walls">Randomize</button>
+    <button id="btnDailyMaze" class="btn-randomize" title="Generate today's seeded 3D maze for this size and difficulty">Daily</button>
     <button id="btnValidate" class="btn-validate">Validate Path</button>
     <button id="btnGetLink" class="btn-link hidden" disabled>Get Link</button>
     <button id="btnScan" class="btn-scan" disabled>Start Scan</button>

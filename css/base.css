@@ -87,6 +87,37 @@ body {
     accent-color: #00d9f5;
 }
 
+.control-group select {
+    background: rgba(8, 12, 24, 0.92);
+    color: #dffbff;
+    border: 1px solid rgba(122, 252, 255, 0.22);
+    border-radius: 999px;
+    padding: 4px 28px 4px 10px;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.toggle-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #b8c9ec;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+}
+
+.toggle-pill input {
+    accent-color: #7afcff;
+}
+
 .val {
     min-width: 28px;
     text-align: center;

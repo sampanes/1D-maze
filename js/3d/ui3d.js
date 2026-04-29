@@ -122,38 +122,59 @@ btnWipe.addEventListener('click', (e) => {
 
 // ── Validate button ───────────────────────────────────────────────────────────
 
+function getSelectedMazeDifficulty3d() {
+    return mazeDifficulty ? mazeDifficulty.value : 'normal';
+}
+
+function randomizeMaze3d(options = {}) {
+    if (scanActive3d) stopScan3d('Returned to build mode.');
+
+    const N = gridSize3d;
+    const difficulty = getSelectedMazeDifficulty3d();
+    const generated = generateRandomSolvableMaze({
+        size: N,
+        dimensions: 3,
+        start: [0, 0, N - 1],
+        end: [N - 1, N - 1, 0],
+        difficulty,
+        seed: options.seed,
+    });
+
+    grid3d = Array.from({ length: N }, () =>
+        Array.from({ length: N }, () => Array(N).fill(1))
+    );
+    for (const key of generated.openKeys) {
+        const [i, j, k] = key.split(',').map(Number);
+        grid3d[k][j][i] = 0;
+    }
+    grid3d[N - 1][0][0] = 0;
+    grid3d[0][N - 1][N - 1] = 0;
+    currentLayer = N - 1;
+
+    const path = bfs3d();
+    btnScan.disabled = !path;
+    btnGetLink.disabled = !path;
+    btnGetLink.classList.toggle('hidden', !path);
+    redraw3d();
+
+    const pct = Math.round(generated.wallRatio * 100);
+    const pathLength = path ? path.length : generated.pathLength;
+    const label = options.dateStamp ? `Daily ${generated.difficulty} 3D maze (${options.dateStamp})` : `Random ${generated.difficulty} 3D maze`;
+    setStatus(`${label} generated with ${pct}% walls. Path: ${pathLength} cells.`, 'success');
+}
+
 if (btnRandomize) {
-    btnRandomize.addEventListener('click', () => {
-        if (scanActive3d) stopScan3d('Returned to build mode.');
+    btnRandomize.addEventListener('click', () => randomizeMaze3d());
+}
 
-        const N = gridSize3d;
-        const generated = generateRandomSolvableMaze({
-            size: N,
+if (btnDailyMaze) {
+    btnDailyMaze.addEventListener('click', () => {
+        const daily = getDailyMazeSeed({
+            size: gridSize3d,
             dimensions: 3,
-            start: [0, 0, N - 1],
-            end: [N - 1, N - 1, 0],
+            difficulty: getSelectedMazeDifficulty3d(),
         });
-
-        grid3d = Array.from({ length: N }, () =>
-            Array.from({ length: N }, () => Array(N).fill(1))
-        );
-        for (const key of generated.openKeys) {
-            const [i, j, k] = key.split(',').map(Number);
-            grid3d[k][j][i] = 0;
-        }
-        grid3d[N - 1][0][0] = 0;
-        grid3d[0][N - 1][N - 1] = 0;
-        currentLayer = N - 1;
-
-        const path = bfs3d();
-        btnScan.disabled = !path;
-        btnGetLink.disabled = !path;
-        btnGetLink.classList.toggle('hidden', !path);
-        redraw3d();
-
-        const pct = Math.round(generated.wallRatio * 100);
-        const pathLength = path ? path.length : generated.pathLength;
-        setStatus(`Random solvable 3D maze generated with ${pct}% walls. Path: ${pathLength} cells.`, 'success');
+        randomizeMaze3d(daily);
     });
 }
 

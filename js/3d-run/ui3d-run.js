@@ -45,6 +45,7 @@ function initUi3dRun() {
     const resetPose = () => {
         if (!run3dState.grid || !run3dState.crossSection) return;
         reset3dRunPoseFromStart();
+        run3dState.breadcrumbs = [];
         run3dState.completed = false;
         const statusBar = document.getElementById('statusBar');
         if (statusBar) {
@@ -70,6 +71,22 @@ function initUi3dRun() {
 
     const centerBtn = document.getElementById('btnCenterRun3dSlice');
     if (centerBtn) centerBtn.addEventListener('click', centerSlice);
+
+    const breadcrumbToggle = document.getElementById('toggleRun3dBreadcrumbs');
+    if (breadcrumbToggle) {
+        breadcrumbToggle.checked = !!run3dState.breadcrumbsEnabled;
+        breadcrumbToggle.addEventListener('change', () => {
+            run3dState.breadcrumbsEnabled = breadcrumbToggle.checked;
+            run3dState.breadcrumbs = [];
+            const statusBar = document.getElementById('statusBar');
+            if (statusBar && run3dState.grid) {
+                statusBar.textContent = run3dState.breadcrumbsEnabled
+                    ? 'Breadcrumbs enabled. This lowers navigation difficulty.'
+                    : 'Breadcrumbs disabled.';
+                statusBar.className = 'status-bar info';
+            }
+        });
+    }
 
     const canvas = document.getElementById('run3dOverviewCanvas');
     if (canvas) {

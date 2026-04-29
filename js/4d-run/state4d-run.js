@@ -21,5 +21,7 @@ const run4dState = {
     completionPulse: 0,
     keys: Object.create(null),
     lastFrameAt: 0,
+    breadcrumbsEnabled: false,
+    breadcrumbs: [],
     completed: false,
 };

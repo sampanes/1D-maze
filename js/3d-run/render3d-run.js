@@ -176,6 +176,42 @@ function projectRectCenter3dRun(rect, camera, canvas) {
     return projectPoint3dRun(center, camera, canvas);
 }
 
+function recordBreadcrumb3dRun() {
+    if (!run3dState.breadcrumbsEnabled || !run3dState.grid) return;
+    const next = {
+        x: run3dState.player.x,
+        y: run3dState.player.y,
+        slice: run3dState.sliceOffset,
+    };
+    const last = run3dState.breadcrumbs[run3dState.breadcrumbs.length - 1];
+    if (last) {
+        const dist = Math.hypot(next.x - last.x, next.y - last.y);
+        const sliceDist = Math.abs(next.slice - last.slice);
+        if (dist < 0.18 && sliceDist < 0.14) return;
+    }
+    run3dState.breadcrumbs.push(next);
+    if (run3dState.breadcrumbs.length > 140) run3dState.breadcrumbs.shift();
+}
+
+function drawBreadcrumbs3dRun(ctx, camera, canvas) {
+    if (!run3dState.breadcrumbsEnabled || !run3dState.breadcrumbs.length) return;
+    const visible = run3dState.breadcrumbs.filter((point) => Math.abs(point.slice - run3dState.sliceOffset) < 0.55);
+    for (let i = 0; i < visible.length; i++) {
+        const crumb = visible[i];
+        const projected = projectPoint3dRun({ x: crumb.x, y: 0.035, z: crumb.y }, camera, canvas);
+        if (!projected) continue;
+        const age = visible.length <= 1 ? 1 : i / (visible.length - 1);
+        const alpha = 0.14 + age * 0.34;
+        const radius = Math.max(2.2, Math.min(5.5, 8 / Math.max(1, projected.depth)));
+        ctx.save();
+        ctx.fillStyle = `rgba(122,252,255,${alpha.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
 function render3dRunOverview() {
     const canvas = document.getElementById('run3dOverviewCanvas');
     if (!canvas) return;
@@ -245,6 +281,8 @@ function render3dRunOverview() {
         if (topProjected.some((p) => p === null)) continue;
         drawQuad3dRun(ctx, topProjected, slab.top, slab.edge);
     }
+
+    drawBreadcrumbs3dRun(ctx, camera, canvas);
 
     const playerBase = projectPoint3dRun({ x: run3dState.player.x, y: 0.02, z: run3dState.player.y }, camera, canvas);
     const playerTop = projectPoint3dRun({ x: run3dState.player.x, y: 0.35, z: run3dState.player.y }, camera, canvas);
@@ -374,6 +412,7 @@ function tick3dRun(ts) {
         moveSlice3dRun(dt);
         run3dState.crossSection = buildCrossSection3dRun(run3dState.grid, run3dState.sliceOffset, run3dState.bfsPath);
         movePlayer3dRun(dt, run3dState.crossSection);
+        recordBreadcrumb3dRun();
         if (!run3dState.completed && playerHitsEnd3dRun(run3dState.crossSection)) {
             run3dState.completed = true;
             const statusBar = document.getElementById('statusBar');

@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const gridSlider    = document.getElementById('gridSlider');
     const gridVal       = document.getElementById('gridVal');
+    const mazeDifficulty = document.getElementById('mazeDifficulty');
     const zLayerPrevBtn = document.getElementById('zLayerPrevBtn');
     const zLayerNextBtn = document.getElementById('zLayerNextBtn');
     const zLayerDisplay = document.getElementById('zLayerDisplay');
@@ -37,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnValidate  = document.getElementById('btnValidate');
     const btnWipe      = document.getElementById('btnWipe');
     const btnRandomize = document.getElementById('btnRandomize');
+    const btnDailyMaze = document.getElementById('btnDailyMaze');
     const btnGetLink   = document.getElementById('btnGetLink');
     const btnResetView    = document.getElementById('btnResetView');
     const statusBar       = document.getElementById('statusBar');
@@ -94,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnValidate.disabled   = !edit;
         btnWipe.disabled       = !edit;
         if (btnRandomize) btnRandomize.disabled = !edit;
+        if (btnDailyMaze) btnDailyMaze.disabled = !edit;
         if (btnGetLink) {
             btnGetLink.disabled = !edit || !solvable4d;
             btnGetLink.classList.toggle('hidden', !solvable4d);
@@ -318,46 +321,67 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ── Validate ──────────────────────────────────────────────────────────────
 
-    if (btnRandomize) {
-        btnRandomize.addEventListener('click', () => {
-            if (scanActive4d) {
-                setScanActive4d(false);
-                updateUiForMode();
-            }
+    function getSelectedMazeDifficulty4d() {
+        return mazeDifficulty ? mazeDifficulty.value : 'normal';
+    }
 
-            const N = gridSize4d;
-            const generated = generateRandomSolvableMaze({
-                size: N,
-                dimensions: 4,
-                start: [0, 0, 0, N - 1],
-                end: [N - 1, N - 1, N - 1, 0],
-            });
-
-            grid4d = Array.from({ length: N }, () =>
-                Array.from({ length: N }, () =>
-                    Array.from({ length: N }, () => Array(N).fill(1))
-                )
-            );
-            for (const key of generated.openKeys) {
-                const [x, y, z, w] = key.split(',').map(Number);
-                grid4d[w][z][y][x] = 0;
-            }
-            grid4d[N - 1][0][0][0] = 0;
-            grid4d[0][N - 1][N - 1][N - 1] = 0;
-
-            hyperLayer = N - 1;
-            hyperSliceOffset = hyperLayerToSlice4d(hyperLayer);
-            editLayerZ4d = -1;
-            invalidateCrossSection4d();
-
-            needsValidation = false;
-            runBfs();
+    function randomizeMaze4d(options = {}) {
+        if (scanActive4d) {
+            setScanActive4d(false);
             updateUiForMode();
-            drawHyperVolume4d();
+        }
 
-            const pct = Math.round(generated.wallRatio * 100);
-            const pathLength = bfsPath4d ? bfsPath4d.length : generated.pathLength;
-            setStatus(`Random solvable 4D maze generated with ${pct}% walls. Path: ${pathLength} cells.`, 'success');
+        const N = gridSize4d;
+        const difficulty = getSelectedMazeDifficulty4d();
+        const generated = generateRandomSolvableMaze({
+            size: N,
+            dimensions: 4,
+            start: [0, 0, 0, N - 1],
+            end: [N - 1, N - 1, N - 1, 0],
+            difficulty,
+            seed: options.seed,
+        });
+
+        grid4d = Array.from({ length: N }, () =>
+            Array.from({ length: N }, () =>
+                Array.from({ length: N }, () => Array(N).fill(1))
+            )
+        );
+        for (const key of generated.openKeys) {
+            const [x, y, z, w] = key.split(',').map(Number);
+            grid4d[w][z][y][x] = 0;
+        }
+        grid4d[N - 1][0][0][0] = 0;
+        grid4d[0][N - 1][N - 1][N - 1] = 0;
+
+        hyperLayer = N - 1;
+        hyperSliceOffset = hyperLayerToSlice4d(hyperLayer);
+        editLayerZ4d = -1;
+        invalidateCrossSection4d();
+
+        needsValidation = false;
+        runBfs();
+        updateUiForMode();
+        drawHyperVolume4d();
+
+        const pct = Math.round(generated.wallRatio * 100);
+        const pathLength = bfsPath4d ? bfsPath4d.length : generated.pathLength;
+        const label = options.dateStamp ? `Daily ${generated.difficulty} 4D maze (${options.dateStamp})` : `Random ${generated.difficulty} 4D maze`;
+        setStatus(`${label} generated with ${pct}% walls. Path: ${pathLength} cells.`, 'success');
+    }
+
+    if (btnRandomize) {
+        btnRandomize.addEventListener('click', () => randomizeMaze4d());
+    }
+
+    if (btnDailyMaze) {
+        btnDailyMaze.addEventListener('click', () => {
+            const daily = getDailyMazeSeed({
+                size: gridSize4d,
+                dimensions: 4,
+                difficulty: getSelectedMazeDifficulty4d(),
+            });
+            randomizeMaze4d(daily);
         });
     }
 

@@ -16,35 +16,56 @@ btnWipe.addEventListener('click', () => {
     setup();
 });
 
-if (btnRandomize) {
-    btnRandomize.addEventListener('click', () => {
-        if (scanActive) stopScan();
+function getSelectedMazeDifficulty() {
+    return mazeDifficulty ? mazeDifficulty.value : 'normal';
+}
 
-        const generated = generateRandomSolvableMaze({
+function randomizeMaze2d(options = {}) {
+    if (scanActive) stopScan();
+
+    const difficulty = getSelectedMazeDifficulty();
+    const generated = generateRandomSolvableMaze({
+        size: gridSize,
+        dimensions: 2,
+        start: [0, 0],
+        end: [gridSize - 1, gridSize - 1],
+        difficulty,
+        seed: options.seed,
+    });
+
+    grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(1));
+    for (const key of generated.openKeys) {
+        const [r, c] = key.split(',').map(Number);
+        grid[r][c] = 0;
+    }
+    grid[0][0] = 0;
+    grid[gridSize - 1][gridSize - 1] = 0;
+
+    bfsPath = bfs();
+    solvable = !!bfsPath;
+    btnScan.disabled = !solvable;
+    updateShareButton();
+    resetScannerState();
+    drawMaze(bfsPath);
+    drawScanView(performance.now());
+
+    const pct = Math.round(generated.wallRatio * 100);
+    const label = options.dateStamp ? `Daily ${generated.difficulty} maze (${options.dateStamp})` : `Random ${generated.difficulty} maze`;
+    setStatus(`${label} generated with ${pct}% walls. Start Scan is enabled.`, 'success');
+}
+
+if (btnRandomize) {
+    btnRandomize.addEventListener('click', () => randomizeMaze2d());
+}
+
+if (btnDailyMaze) {
+    btnDailyMaze.addEventListener('click', () => {
+        const daily = getDailyMazeSeed({
             size: gridSize,
             dimensions: 2,
-            start: [0, 0],
-            end: [gridSize - 1, gridSize - 1],
+            difficulty: getSelectedMazeDifficulty(),
         });
-
-        grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(1));
-        for (const key of generated.openKeys) {
-            const [r, c] = key.split(',').map(Number);
-            grid[r][c] = 0;
-        }
-        grid[0][0] = 0;
-        grid[gridSize - 1][gridSize - 1] = 0;
-
-        bfsPath = bfs();
-        solvable = !!bfsPath;
-        btnScan.disabled = !solvable;
-        updateShareButton();
-        resetScannerState();
-        drawMaze(bfsPath);
-        drawScanView(performance.now());
-
-        const pct = Math.round(generated.wallRatio * 100);
-        setStatus(`Random solvable maze generated with ${pct}% walls. Start Scan is enabled.`, 'success');
+        randomizeMaze2d(daily);
     });
 }
 

@@ -18,5 +18,7 @@ const run3dState = {
     keys: Object.create(null),
     lastFrameAt: 0,
     viewMode: 'continuous_slice_irl',
+    breadcrumbsEnabled: false,
+    breadcrumbs: [],
     completed: false,
 };
